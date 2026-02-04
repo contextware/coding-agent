@@ -28,7 +28,7 @@ export async function executeAgentInSandbox(
     GEMINI_API_KEY?: string
     CURSOR_API_KEY?: string
     ANTHROPIC_API_KEY?: string
-    AI_GATEWAY_API_KEY?: string
+    OPENROUTER_API_KEY?: string
   },
   isResumed?: boolean,
   sessionId?: string,
@@ -59,16 +59,22 @@ export async function executeAgentInSandbox(
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     CURSOR_API_KEY: process.env.CURSOR_API_KEY,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
-    AI_GATEWAY_API_KEY: process.env.AI_GATEWAY_API_KEY,
+    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
     GH_TOKEN: process.env.GH_TOKEN,
     GITHUB_TOKEN: process.env.GITHUB_TOKEN,
+  }
+
+  // Log which API keys are available for debugging
+  if (agentType === 'gemini') {
+    const hasGeminiKey = !!(apiKeys?.GEMINI_API_KEY || originalEnv.GEMINI_API_KEY)
+    await logger.info(`Gemini agent: API key ${hasGeminiKey ? 'available' : 'NOT FOUND'}`)
   }
 
   if (apiKeys?.OPENAI_API_KEY) process.env.OPENAI_API_KEY = apiKeys.OPENAI_API_KEY
   if (apiKeys?.GEMINI_API_KEY) process.env.GEMINI_API_KEY = apiKeys.GEMINI_API_KEY
   if (apiKeys?.CURSOR_API_KEY) process.env.CURSOR_API_KEY = apiKeys.CURSOR_API_KEY
   if (apiKeys?.ANTHROPIC_API_KEY) process.env.ANTHROPIC_API_KEY = apiKeys.ANTHROPIC_API_KEY
-  if (apiKeys?.AI_GATEWAY_API_KEY) process.env.AI_GATEWAY_API_KEY = apiKeys.AI_GATEWAY_API_KEY
+  if (apiKeys?.OPENROUTER_API_KEY) process.env.OPENROUTER_API_KEY = apiKeys.OPENROUTER_API_KEY
   if (githubToken) {
     process.env.GH_TOKEN = githubToken
     process.env.GITHUB_TOKEN = githubToken
@@ -152,7 +158,7 @@ export async function executeAgentInSandbox(
     process.env.GEMINI_API_KEY = originalEnv.GEMINI_API_KEY
     process.env.CURSOR_API_KEY = originalEnv.CURSOR_API_KEY
     process.env.ANTHROPIC_API_KEY = originalEnv.ANTHROPIC_API_KEY
-    process.env.AI_GATEWAY_API_KEY = originalEnv.AI_GATEWAY_API_KEY
+    process.env.OPENROUTER_API_KEY = originalEnv.OPENROUTER_API_KEY
     process.env.GH_TOKEN = originalEnv.GH_TOKEN
     process.env.GITHUB_TOKEN = originalEnv.GITHUB_TOKEN
   }

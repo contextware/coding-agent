@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserApiKey } from '@/lib/api-keys/user-keys'
 
-type Provider = 'openai' | 'gemini' | 'cursor' | 'anthropic' | 'aigateway'
+type Provider = 'openai' | 'gemini' | 'cursor' | 'anthropic' | 'openrouter'
 
 // Map agents to their required providers
+// Most agents use OpenRouter, but Gemini CLI requires a direct Gemini API key
 const AGENT_PROVIDER_MAP: Record<string, Provider | null> = {
-  claude: 'aigateway', // Claude uses Vercel AI Gateway
-  codex: 'aigateway', // Codex uses Vercel AI Gateway
+  claude: 'openrouter', // Uses OpenRouter
+  codex: 'openrouter', // Uses OpenRouter
   copilot: null, // Copilot uses user's GitHub token from their account
-  cursor: 'cursor',
-  gemini: 'gemini',
-  opencode: 'openai', // OpenCode can use OpenAI or Anthropic, but primarily OpenAI
+  cursor: 'openrouter', // Uses OpenRouter
+  gemini: 'gemini', // Gemini CLI requires direct Gemini API key (does NOT support OpenRouter)
+  opencode: 'openrouter', // Uses OpenRouter
 }
 
 // Check if a model is an Anthropic model
@@ -63,18 +64,8 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // Override provider based on model for multi-provider agents
-    if (model && (agent === 'cursor' || agent === 'opencode')) {
-      if (isAnthropicModel(model)) {
-        provider = 'anthropic'
-      } else if (isGeminiModel(model)) {
-        provider = 'gemini'
-      } else if (isOpenAIModel(model)) {
-        // For OpenAI models, prefer AI Gateway if available, otherwise use OpenAI
-        provider = 'aigateway'
-      }
-      // For cursor with no recognizable pattern, keep the default 'cursor' provider
-    }
+    // Since we're using OpenRouter, all models use the same provider
+    // No need to override based on model type
 
     // Check if API key is available (either user's or system)
     const apiKey = await getUserApiKey(provider!)

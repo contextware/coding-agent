@@ -45,9 +45,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // If not in registry, try to reconnect using sandboxId from database
     if (!sandbox) {
       try {
-        const sandboxToken = process.env.SANDBOX_VERCEL_TOKEN
-        const teamId = process.env.SANDBOX_VERCEL_TEAM_ID
-        const projectId = process.env.SANDBOX_VERCEL_PROJECT_ID
+        const sandboxToken = process.env.VERCEL_TOKEN
+        const teamId = process.env.VERCEL_TEAM_ID
+        const projectId = process.env.VERCEL_PROJECT_ID
 
         if (!sandboxToken || !teamId || !projectId) {
           return NextResponse.json({ success: false, error: 'Sandbox credentials not configured' }, { status: 500 })

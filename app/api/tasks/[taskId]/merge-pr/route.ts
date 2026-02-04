@@ -58,9 +58,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       try {
         const sandbox = await Sandbox.get({
           sandboxId: task.sandboxId,
-          teamId: process.env.SANDBOX_VERCEL_TEAM_ID!,
-          projectId: process.env.SANDBOX_VERCEL_PROJECT_ID!,
-          token: process.env.SANDBOX_VERCEL_TOKEN!,
+          teamId: process.env.VERCEL_TEAM_ID!,
+          projectId: process.env.VERCEL_PROJECT_ID!,
+          token: process.env.VERCEL_TOKEN!,
         })
 
         await sandbox.stop()

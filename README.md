@@ -8,7 +8,7 @@ A template for building AI-powered coding agents that supports Claude Code, Open
 
 You can deploy your own version of the coding agent template to Vercel with one click:
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel-labs%2Fcoding-agent-template&env=SANDBOX_VERCEL_TEAM_ID,SANDBOX_VERCEL_PROJECT_ID,SANDBOX_VERCEL_TOKEN,JWE_SECRET,ENCRYPTION_KEY&envDescription=Required+environment+variables+for+the+coding+agent+template.+You+must+also+configure+at+least+one+OAuth+provider+(GitHub+or+Vercel)+after+deployment.+Optional+API+keys+can+be+added+later.&stores=%5B%7B%22type%22%3A%22postgres%22%7D%5D&project-name=coding-agent-template&repository-name=coding-agent-template)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel-labs%2Fcoding-agent-template&env=VERCEL_TEAM_ID,VERCEL_PROJECT_ID,VERCEL_TOKEN,JWE_SECRET,ENCRYPTION_KEY&envDescription=Required+environment+variables+for+the+coding+agent+template.+You+must+also+configure+at+least+one+OAuth+provider+(GitHub+or+Vercel)+after+deployment.+Optional+API+keys+can+be+added+later.&stores=%5B%7B%22type%22%3A%22postgres%22%7D%5D&project-name=coding-agent-template&repository-name=coding-agent-template)
 
 **What happens during deployment:**
 - **Automatic Database Setup**: A Neon Postgres database is automatically created and connected to your project
@@ -21,8 +21,8 @@ You can deploy your own version of the coding agent template to Vercel with one 
 - **User Authentication**: Secure sign-in with GitHub or Vercel OAuth
 - **Multi-User Support**: Each user has their own tasks, API keys, and GitHub connection
 - **Vercel Sandbox**: Runs code in isolated, secure sandboxes ([docs](https://vercel.com/docs/vercel-sandbox))
-- **AI Gateway Integration**: Built for seamless integration with [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) for model routing and observability
-- **AI-Generated Branch Names**: Automatically generates descriptive Git branch names using AI SDK 5 + AI Gateway
+- **OpenRouter Integration**: Built for seamless integration with [OpenRouter](https://openrouter.ai) for model routing and observability
+- **AI-Generated Branch Names**: Automatically generates descriptive Git branch names using AI SDK 5 + OpenRouter
 - **Task Management**: Track task progress with real-time updates
 - **Persistent Storage**: Tasks stored in Neon Postgres database
 - **Git Integration**: Automatically creates branches and commits changes
@@ -122,7 +122,7 @@ When Keep Alive is enabled, the sandbox stays alive after task completion for th
 ## How It Works
 
 1. **Task Creation**: When you submit a task, it's stored in the database
-2. **AI Branch Name Generation**: AI SDK 5 + AI Gateway automatically generates a descriptive branch name based on your task (non-blocking using Next.js 15's `after()`)
+2. **AI Branch Name Generation**: AI SDK 5 + OpenRouter automatically generates a descriptive branch name based on your task (non-blocking using Next.js 15's `after()`)
 3. **Sandbox Setup**: A Vercel sandbox is created with your repository
 4. **Agent Execution**: Your chosen coding agent (Claude Code, Codex CLI, GitHub Copilot CLI, Cursor CLI, Gemini CLI, or opencode) analyzes your prompt and makes changes
 5. **Git Operations**: Changes are committed and pushed to the AI-generated branch
@@ -130,7 +130,7 @@ When Keep Alive is enabled, the sandbox stays alive after task completion for th
 
 ## AI Branch Name Generation
 
-The system automatically generates descriptive Git branch names using AI SDK 5 and Vercel AI Gateway. This feature:
+The system automatically generates descriptive Git branch names using AI SDK 5 and OpenRouter. This feature:
 
 - **Non-blocking**: Uses Next.js 15's `after()` function to generate names without delaying task creation
 - **Descriptive**: Creates meaningful branch names like `feature/user-authentication-A1b2C3` or `fix/memory-leak-parser-X9y8Z7`
@@ -150,7 +150,7 @@ The system automatically generates descriptive Git branch names using AI SDK 5 a
 - **Frontend**: Next.js 15, React 19, Tailwind CSS
 - **UI Components**: shadcn/ui
 - **Database**: PostgreSQL with Drizzle ORM
-- **AI SDK**: AI SDK 5 with Vercel AI Gateway integration
+- **AI SDK**: AI SDK 5 with OpenRouter integration
 - **AI Agents**: Claude Code, OpenAI Codex CLI, GitHub Copilot CLI, Cursor CLI, Google Gemini CLI, opencode
 - **Sandbox**: [Vercel Sandbox](https://vercel.com/docs/vercel-sandbox)
 - **Authentication**: Next Auth (OAuth with GitHub/Vercel)
@@ -192,9 +192,9 @@ Create a `.env.local` file with your values:
 These are set once by you (the app developer) and are used for core infrastructure:
 
 - `POSTGRES_URL`: Your PostgreSQL connection string (automatically provided when deploying to Vercel via the Neon integration, or set manually for local development)
-- `SANDBOX_VERCEL_TOKEN`: Your Vercel API token (for creating sandboxes)
-- `SANDBOX_VERCEL_TEAM_ID`: Your Vercel team ID (for sandbox creation)
-- `SANDBOX_VERCEL_PROJECT_ID`: Your Vercel project ID (for sandbox creation)
+- `VERCEL_TOKEN`: Your Vercel API token (for creating sandboxes)
+- `VERCEL_TEAM_ID`: Your Vercel team ID (for sandbox creation)
+- `VERCEL_PROJECT_ID`: Your Vercel project ID (for sandbox creation)
 - `JWE_SECRET`: Base64-encoded secret for session encryption (generate with: `openssl rand -base64 32`)
 - `ENCRYPTION_KEY`: 32-byte hex string for encrypting user API keys and tokens (generate with: `openssl rand -hex 32`)
 
@@ -241,7 +241,7 @@ NEXT_PUBLIC_AUTH_PROVIDERS=github,vercel
 These API keys can be set globally (fallback for all users) or left unset to require users to provide their own:
 
 - `ANTHROPIC_API_KEY`: Anthropic API key for Claude agent (users can override in their profile)
-- `AI_GATEWAY_API_KEY`: AI Gateway API key for branch name generation and Codex (users can override)
+- `OPENROUTER_API_KEY`: OpenRouter API key for branch name generation and Codex (users can override)
 - `CURSOR_API_KEY`: For Cursor agent support (users can override)
 - `GEMINI_API_KEY`: For Google Gemini agent support (users can override)
 - `OPENAI_API_KEY`: For Codex and OpenCode agents (users can override)
@@ -372,7 +372,7 @@ This release introduces **user authentication** and **major security improvement
 
 - **Multi-User Support**
   - Each user has their own tasks and connectors
-  - Users can manage their own API keys (Anthropic, OpenAI, Cursor, Gemini, AI Gateway)
+  - Users can manage their own API keys (Anthropic, OpenAI, Cursor, Gemini, OpenRouter)
   - GitHub account connection for repository access
 
 - **Security Enhancements**

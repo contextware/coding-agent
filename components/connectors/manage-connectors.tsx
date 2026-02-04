@@ -16,8 +16,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { createConnector, updateConnector, deleteConnector, toggleConnectorStatus } from '@/lib/actions/connectors'
 import type { Connector } from '@/lib/db/schema'
+import type { RegistryMcpServer } from '@/app/api/mcp-registry/route'
 import { useActionState } from 'react'
 import { toast } from 'sonner'
 import { useEffect, useState, useRef } from 'react'
@@ -124,6 +126,8 @@ const PRESETS: PresetConfig[] = [
 export function ConnectorDialog({ open, onOpenChange }: ConnectorDialogProps) {
   const { connectors, refreshConnectors, isLoading: connectorsLoading } = useConnectors()
   const [loadingConnectors, setLoadingConnectors] = useState<Set<string>>(new Set())
+  const [registryServers, setRegistryServers] = useState<RegistryMcpServer[]>([])
+  const [loadingRegistry, setLoadingRegistry] = useState(false)
 
   // Jotai atoms
   const [view, setView] = useAtom(connectorDialogViewAtom)
@@ -187,6 +191,26 @@ export function ConnectorDialog({ open, onOpenChange }: ConnectorDialogProps) {
       lastStateRef.current = { success: state.success, message: state.message }
     }
   }, [state.success, state.message, refreshConnectors, onSuccessAction])
+
+  // Fetch registry servers when dialog opens and view is 'presets'
+  useEffect(() => {
+    if (open && view === 'presets') {
+      setLoadingRegistry(true)
+      fetch('/api/mcp-registry')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && Array.isArray(data.data)) {
+            setRegistryServers(data.data)
+          }
+        })
+        .catch((error) => {
+          console.error('Failed to fetch registry servers:', error)
+        })
+        .finally(() => {
+          setLoadingRegistry(false)
+        })
+    }
+  }, [open, view])
 
   const addEnvVar = () => {
     setEnvVars([...envVars, { key: '', value: '' }])
@@ -396,37 +420,98 @@ export function ConnectorDialog({ open, onOpenChange }: ConnectorDialogProps) {
             </div>
           ) : view === 'presets' ? (
             <div className="space-y-4 overflow-y-auto max-h-[60vh]">
-              <div className="grid grid-cols-3 gap-6">
-                {PRESETS.map((preset) => (
-                  <button
-                    key={preset.name}
-                    className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-muted transition-colors cursor-pointer"
-                    onClick={() => selectPresetAction(preset)}
-                    type="button"
-                  >
-                    {preset.name === 'Browserbase' ? (
-                      <BrowserbaseIcon style={{ width: 48, height: 48 }} className="flex-shrink-0" />
-                    ) : preset.name === 'Context7' ? (
-                      <Context7Icon style={{ width: 48, height: 48 }} className="flex-shrink-0" />
-                    ) : preset.name === 'Convex' ? (
-                      <ConvexIcon style={{ width: 48, height: 48 }} className="flex-shrink-0" />
-                    ) : preset.name === 'Figma' ? (
-                      <FigmaIcon style={{ width: 48, height: 48 }} className="flex-shrink-0" />
-                    ) : preset.name === 'Hugging Face' ? (
-                      <HuggingFaceIcon style={{ width: 48, height: 48 }} className="flex-shrink-0" />
-                    ) : preset.name === 'Linear' ? (
-                      <LinearIcon style={{ width: 48, height: 48 }} className="flex-shrink-0" />
-                    ) : preset.name === 'Notion' ? (
-                      <NotionIcon style={{ width: 48, height: 48 }} className="flex-shrink-0" />
-                    ) : preset.name === 'Playwright' ? (
-                      <PlaywrightIcon style={{ width: 48, height: 48 }} className="flex-shrink-0" />
-                    ) : preset.name === 'Supabase' ? (
-                      <SupabaseIcon style={{ width: 48, height: 48 }} className="flex-shrink-0" />
-                    ) : null}
-                    <span className="text-sm font-medium text-center">{preset.name}</span>
-                  </button>
-                ))}
-              </div>
+              <Tabs defaultValue="system" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="system">System</TabsTrigger>
+                  <TabsTrigger value="standard">Standard</TabsTrigger>
+                </TabsList>
+                <TabsContent value="system" className="space-y-4">
+                  {loadingRegistry ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : registryServers.length === 0 ? (
+                    <Card className="p-6 text-center">
+                      <p className="text-sm text-muted-foreground">No system MCP servers available.</p>
+                    </Card>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-6">
+                      {registryServers.map((server, index) => {
+                        // Extract short name from full namespace (e.g., "io.modelcontextprotocol.anonymous/nango-mcp-server" -> "nango-mcp-server")
+                        const fullName = server.server?.name || ''
+                        const shortName = fullName.split('/').pop() || fullName
+
+                        // Truncate description to first sentence or 100 chars
+                        const description = server.server?.description || ''
+                        const shortDescription = description.split(/[.\n]/)[0].substring(0, 100)
+
+                        return (
+                          <button
+                            key={fullName || `registry-server-${index}`}
+                            className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-muted transition-colors cursor-pointer"
+                            onClick={() =>
+                              selectPresetAction({
+                                name: fullName,
+                                type: 'remote',
+                                command: undefined,
+                                url: server.server?.remotes?.[0]?.url,
+                                envKeys: server.server?.remotes?.[0]?.headers?.map((h: any) => h.name),
+                              })
+                            }
+                            type="button"
+                          >
+                            <Server style={{ width: 32, height: 32 }} className="flex-shrink-0 text-muted-foreground" />
+                            <span className="text-xs font-medium text-center line-clamp-1" title={fullName}>
+                              {shortName}
+                            </span>
+                            {shortDescription && (
+                              <span
+                                className="text-[10px] text-muted-foreground text-center line-clamp-2"
+                                title={description}
+                              >
+                                {shortDescription}
+                              </span>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </TabsContent>
+                <TabsContent value="standard" className="space-y-4">
+                  <div className="grid grid-cols-3 gap-6">
+                    {PRESETS.map((preset) => (
+                      <button
+                        key={preset.name}
+                        className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-muted transition-colors cursor-pointer"
+                        onClick={() => selectPresetAction(preset)}
+                        type="button"
+                      >
+                        {preset.name === 'Browserbase' ? (
+                          <BrowserbaseIcon style={{ width: 48, height: 48 }} className="flex-shrink-0" />
+                        ) : preset.name === 'Context7' ? (
+                          <Context7Icon style={{ width: 48, height: 48 }} className="flex-shrink-0" />
+                        ) : preset.name === 'Convex' ? (
+                          <ConvexIcon style={{ width: 48, height: 48 }} className="flex-shrink-0" />
+                        ) : preset.name === 'Figma' ? (
+                          <FigmaIcon style={{ width: 48, height: 48 }} className="flex-shrink-0" />
+                        ) : preset.name === 'Hugging Face' ? (
+                          <HuggingFaceIcon style={{ width: 48, height: 48 }} className="flex-shrink-0" />
+                        ) : preset.name === 'Linear' ? (
+                          <LinearIcon style={{ width: 48, height: 48 }} className="flex-shrink-0" />
+                        ) : preset.name === 'Notion' ? (
+                          <NotionIcon style={{ width: 48, height: 48 }} className="flex-shrink-0" />
+                        ) : preset.name === 'Playwright' ? (
+                          <PlaywrightIcon style={{ width: 48, height: 48 }} className="flex-shrink-0" />
+                        ) : preset.name === 'Supabase' ? (
+                          <SupabaseIcon style={{ width: 48, height: 48 }} className="flex-shrink-0" />
+                        ) : null}
+                        <span className="text-sm font-medium text-center">{preset.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </TabsContent>
+              </Tabs>
               <Button variant="outline" className="w-full" onClick={() => addCustomServer()}>
                 Add Custom MCP Server
               </Button>

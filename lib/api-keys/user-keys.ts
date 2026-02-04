@@ -6,7 +6,7 @@ import { eq, and } from 'drizzle-orm'
 import { getServerSession } from '@/lib/session/get-server-session'
 import { decrypt } from '@/lib/crypto'
 
-type Provider = 'openai' | 'gemini' | 'cursor' | 'anthropic' | 'aigateway'
+type Provider = 'openai' | 'gemini' | 'cursor' | 'anthropic' | 'openrouter'
 
 /**
  * Get API keys for the currently authenticated user
@@ -17,7 +17,7 @@ export async function getUserApiKeys(): Promise<{
   GEMINI_API_KEY: string | undefined
   CURSOR_API_KEY: string | undefined
   ANTHROPIC_API_KEY: string | undefined
-  AI_GATEWAY_API_KEY: string | undefined
+  OPENROUTER_API_KEY: string | undefined
 }> {
   const session = await getServerSession()
 
@@ -27,7 +27,7 @@ export async function getUserApiKeys(): Promise<{
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     CURSOR_API_KEY: process.env.CURSOR_API_KEY,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
-    AI_GATEWAY_API_KEY: process.env.AI_GATEWAY_API_KEY,
+    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
   }
 
   if (!session?.user?.id) {
@@ -53,8 +53,8 @@ export async function getUserApiKeys(): Promise<{
         case 'anthropic':
           apiKeys.ANTHROPIC_API_KEY = decryptedValue
           break
-        case 'aigateway':
-          apiKeys.AI_GATEWAY_API_KEY = decryptedValue
+        case 'openrouter':
+          apiKeys.OPENROUTER_API_KEY = decryptedValue
           break
       }
     })
@@ -79,8 +79,11 @@ export async function getUserApiKey(provider: Provider): Promise<string | undefi
     gemini: process.env.GEMINI_API_KEY,
     cursor: process.env.CURSOR_API_KEY,
     anthropic: process.env.ANTHROPIC_API_KEY,
-    aigateway: process.env.AI_GATEWAY_API_KEY,
+    openrouter: process.env.OPENROUTER_API_KEY,
   }
+
+  // OpenRouter is system-only (not stored in user keys table) - actually we allow it now if it's in the keys table
+  // but if provider is openrouter we check both
 
   if (!session?.user?.id) {
     return systemKeys[provider]

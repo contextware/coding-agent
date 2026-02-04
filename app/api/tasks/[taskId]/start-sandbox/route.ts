@@ -46,9 +46,9 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       try {
         const existingSandbox = await Sandbox.get({
           sandboxId: task.sandboxId,
-          teamId: process.env.SANDBOX_VERCEL_TEAM_ID!,
-          projectId: process.env.SANDBOX_VERCEL_PROJECT_ID!,
-          token: process.env.SANDBOX_VERCEL_TOKEN!,
+          teamId: process.env.VERCEL_TEAM_ID!,
+          projectId: process.env.VERCEL_PROJECT_ID!,
+          token: process.env.VERCEL_TOKEN!,
         })
 
         // Try a simple command to verify it's accessible
@@ -89,9 +89,9 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
     // Create a new sandbox by cloning the repo
     const sandbox = await Sandbox.create({
-      teamId: process.env.SANDBOX_VERCEL_TEAM_ID!,
-      projectId: process.env.SANDBOX_VERCEL_PROJECT_ID!,
-      token: process.env.SANDBOX_VERCEL_TOKEN!,
+      teamId: process.env.VERCEL_TEAM_ID!,
+      projectId: process.env.VERCEL_PROJECT_ID!,
+      token: process.env.VERCEL_TOKEN!,
       source:
         task.repoUrl && task.branchName
           ? {

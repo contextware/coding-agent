@@ -10,7 +10,12 @@ export const db = new Proxy({} as ReturnType<typeof drizzle>, {
       if (!process.env.POSTGRES_URL) {
         throw new Error('POSTGRES_URL environment variable is required')
       }
-      const client = postgres(process.env.POSTGRES_URL)
+      // Configure connection pooling to prevent "too many clients" error
+      const client = postgres(process.env.POSTGRES_URL, {
+        max: 10, // Maximum number of connections in the pool
+        idle_timeout: 20, // Close idle connections after 20 seconds
+        connect_timeout: 10, // Connection timeout in seconds
+      })
       _db = drizzle(client, { schema })
     }
     return Reflect.get(_db, prop)

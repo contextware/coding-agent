@@ -120,9 +120,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         // Try to reconnect if not in registry
         if (!sandbox) {
-          const sandboxToken = process.env.SANDBOX_VERCEL_TOKEN
-          const teamId = process.env.SANDBOX_VERCEL_TEAM_ID
-          const projectId = process.env.SANDBOX_VERCEL_PROJECT_ID
+          const sandboxToken = process.env.VERCEL_TOKEN
+          const teamId = process.env.VERCEL_TEAM_ID
+          const projectId = process.env.VERCEL_PROJECT_ID
 
           if (sandboxToken && teamId && projectId) {
             sandbox = await Sandbox.get({
@@ -348,9 +348,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         // Try to reconnect if not in registry
         if (!sandbox) {
-          const sandboxToken = process.env.SANDBOX_VERCEL_TOKEN
-          const teamId = process.env.SANDBOX_VERCEL_TEAM_ID
-          const projectId = process.env.SANDBOX_VERCEL_PROJECT_ID
+          const sandboxToken = process.env.VERCEL_TOKEN
+          const teamId = process.env.VERCEL_TEAM_ID
+          const projectId = process.env.VERCEL_PROJECT_ID
 
           if (sandboxToken && teamId && projectId) {
             sandbox = await Sandbox.get({
@@ -550,7 +550,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             changes: 0,
           }))
       } catch (error: unknown) {
-        console.error('Error fetching repository tree:', error)
+        // Only log non-404 errors (404 is expected when branch hasn't been pushed yet)
+        if (!(error && typeof error === 'object' && 'status' in error && error.status === 404)) {
+          console.error('Error fetching repository tree:', error)
+        }
+
         if (error && typeof error === 'object' && 'status' in error && error.status === 404) {
           return NextResponse.json({
             success: true,

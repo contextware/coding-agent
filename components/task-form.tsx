@@ -133,14 +133,14 @@ const DEFAULT_MODELS = {
 // API key requirements for each agent
 const AGENT_API_KEY_REQUIREMENTS: Record<string, Provider[]> = {
   claude: ['anthropic'],
-  codex: ['aigateway'], // Uses AI Gateway for OpenAI proxy
+  codex: ['openrouter'], // Uses OpenRouter
   copilot: [], // Uses user's GitHub account token automatically
   cursor: ['cursor'],
   gemini: ['gemini'],
   opencode: [], // Will be determined dynamically based on selected model
 }
 
-type Provider = 'openai' | 'gemini' | 'cursor' | 'anthropic' | 'aigateway'
+type Provider = 'openai' | 'gemini' | 'cursor' | 'anthropic' | 'openrouter'
 
 // Helper to determine which API key is needed for opencode based on model
 const getOpenCodeRequiredKeys = (model: string): Provider[] => {
@@ -148,12 +148,12 @@ const getOpenCodeRequiredKeys = (model: string): Provider[] => {
   if (model.includes('claude') || model.includes('sonnet') || model.includes('opus')) {
     return ['anthropic']
   }
-  // Check if it's an OpenAI/GPT model (uses AI Gateway)
+  // Check if it's an OpenAI/GPT model (uses OpenRouter)
   if (model.includes('gpt')) {
-    return ['aigateway']
+    return ['openrouter']
   }
   // Fallback to both if we can't determine
-  return ['aigateway', 'anthropic']
+  return ['openrouter', 'anthropic']
 }
 
 export function TaskForm({
@@ -162,10 +162,10 @@ export function TaskForm({
   selectedOwner,
   selectedRepo,
   initialInstallDependencies = false,
-  initialMaxDuration = 300,
+  initialMaxDuration = 45,
   initialKeepAlive = false,
   initialEnableBrowser = false,
-  maxSandboxDuration = 300,
+  maxSandboxDuration = 45,
 }: TaskFormProps) {
   const [prompt, setPrompt] = useAtom(taskPromptAtom)
   const [savedAgent, setSavedAgent] = useAtom(lastSelectedAgentAtom)
@@ -367,7 +367,7 @@ export function TaskForm({
             openai: 'OpenAI',
             cursor: 'Cursor',
             gemini: 'Gemini',
-            aigateway: 'AI Gateway',
+            openrouter: 'OpenRouter',
           }
           const providerName = providerNames[data.provider] || data.provider
 
@@ -411,12 +411,12 @@ export function TaskForm({
           </a>{' '}
           and{' '}
           <a
-            href="https://vercel.com/docs/ai-gateway"
+            href="https://openrouter.ai"
             target="_blank"
             rel="noopener noreferrer"
             className="underline hover:no-underline"
           >
-            AI Gateway
+            OpenRouter
           </a>
         </p>
       </div>
@@ -487,7 +487,7 @@ export function TaskForm({
 
                 {/* Model Selection - Fills available width on mobile */}
                 {selectedAgent === 'multi-agent' ? (
-                  <Select value="multi-select" onValueChange={() => {}} disabled={isSubmitting}>
+                  <Select value="multi-select" onValueChange={() => { }} disabled={isSubmitting}>
                     <SelectTrigger className="flex-1 sm:flex-none sm:w-auto sm:min-w-[140px] border-0 bg-transparent shadow-none focus:ring-0 h-8 min-w-0">
                       <SelectValue>
                         {selectedModels.length === 0 ? 'Select models' : `${selectedModels.length} Selected`}

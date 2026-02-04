@@ -12,7 +12,7 @@ export interface SandboxConfig {
     GEMINI_API_KEY?: string
     CURSOR_API_KEY?: string
     ANTHROPIC_API_KEY?: string
-    AI_GATEWAY_API_KEY?: string
+    OPENROUTER_API_KEY?: string
   }
   timeout?: string
   ports?: number[]

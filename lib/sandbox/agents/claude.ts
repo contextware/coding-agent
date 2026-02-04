@@ -83,12 +83,12 @@ export async function installClaudeCLI(
   if (claudeInstall.success) {
     await logger.info('Claude CLI installed successfully')
 
-    // Authenticate Claude CLI with API key (using AI Gateway)
-    const apiKey = process.env.AI_GATEWAY_API_KEY
-    const baseUrl = 'https://ai-gateway.vercel.sh'
+    // Authenticate Claude CLI with API key (using OpenRouter)
+    const apiKey = process.env.OPENROUTER_API_KEY
+    const baseUrl = 'https://openrouter.ai/api'
 
     if (apiKey) {
-      await logger.info('Authenticating Claude CLI with AI Gateway...')
+      await logger.info('Authenticating Claude CLI with OpenRouter...')
 
       // Create Claude config directory (use $HOME instead of ~)
       await runCommandInSandbox(sandbox, 'mkdir', ['-p', '$HOME/.config/claude'])
@@ -104,7 +104,7 @@ export async function installClaudeCLI(
 
           if (server.type === 'local') {
             // Local STDIO server - command string contains both executable and args
-            const envPrefix = `ANTHROPIC_API_KEY="${apiKey}" ANTHROPIC_BASE_URL="${baseUrl}"`
+            const envPrefix = `ANTHROPIC_API_KEY="" ANTHROPIC_BASE_URL="${baseUrl}" ANTHROPIC_AUTH_TOKEN="${apiKey}" OPENROUTER_API_KEY="${apiKey}"`
             let addMcpCmd = `${envPrefix} claude mcp add "${serverName}" -- ${server.command}`
 
             // Add env vars if provided
@@ -125,7 +125,7 @@ export async function installClaudeCLI(
             }
           } else {
             // Remote HTTP/SSE server
-            const envPrefix = `ANTHROPIC_API_KEY="${apiKey}" ANTHROPIC_BASE_URL="${baseUrl}"`
+            const envPrefix = `ANTHROPIC_API_KEY="" ANTHROPIC_BASE_URL="${baseUrl}" ANTHROPIC_AUTH_TOKEN="${apiKey}" OPENROUTER_API_KEY="${apiKey}"`
             let addMcpCmd = `${envPrefix} claude mcp add --transport http "${serverName}" "${server.baseUrl}"`
 
             if (server.oauthClientSecret) {
@@ -148,7 +148,22 @@ export async function installClaudeCLI(
         }
       }
 
-      const modelToUse = selectedModel || 'claude-sonnet-4-5'
+      // Map UI model names to OpenRouter model names
+      const mapModelName = (model: string): string => {
+        const modelMappings: Record<string, string> = {
+          'claude-sonnet-4-5': 'anthropic/claude-sonnet-4.5',
+          'claude-opus-4-5': 'anthropic/claude-opus-4.5',
+          'claude-haiku-4-5': 'anthropic/claude-haiku-4.5',
+          'claude-sonnet-4.5': 'anthropic/claude-sonnet-4.5',
+          'claude-opus-4.5': 'anthropic/claude-opus-4.5',
+          'claude-haiku-4.5': 'anthropic/claude-haiku-4.5',
+          'claude-sonnet-4': 'anthropic/claude-4-sonnet',
+          'claude-4-sonnet': 'anthropic/claude-4-sonnet',
+        }
+        return modelMappings[model] || model
+      }
+
+      const modelToUse = mapModelName(selectedModel || 'claude-sonnet-4-5')
       const configFileCmd = `mkdir -p $HOME/.config/claude && cat > $HOME/.config/claude/config.json << 'EOF'
 {
   "api_key": "${apiKey}",
@@ -167,7 +182,7 @@ EOF`
       // Verify authentication
       const verifyAuth = await runCommandInSandbox(sandbox, 'sh', [
         '-c',
-        `ANTHROPIC_API_KEY=${apiKey} ANTHROPIC_BASE_URL=${baseUrl} claude --version`,
+        `ANTHROPIC_API_KEY="" ANTHROPIC_BASE_URL=${baseUrl} ANTHROPIC_AUTH_TOKEN=${apiKey} OPENROUTER_API_KEY=${apiKey} claude --version`,
       ])
       if (verifyAuth.success) {
         await logger.info('Claude CLI authentication verified')
@@ -175,7 +190,7 @@ EOF`
         await logger.info('Warning: Claude CLI authentication could not be verified')
       }
     } else {
-      await logger.info('Warning: AI_GATEWAY_API_KEY not found, Claude CLI may not work')
+      await logger.info('Warning: OPENROUTER_API_KEY not found, Claude CLI may not work')
     }
 
     return { success: true }
@@ -237,26 +252,43 @@ export async function executeClaudeInSandbox(
       }
     }
 
-    // Check if AI_GATEWAY_API_KEY is available
-    if (!process.env.AI_GATEWAY_API_KEY) {
+    // Check if OPENROUTER_API_KEY is available
+    if (!process.env.OPENROUTER_API_KEY) {
       return {
         success: false,
-        error: 'AI_GATEWAY_API_KEY environment variable is required but not found',
+        error: 'OPENROUTER_API_KEY environment variable is required but not found',
         cliName: 'claude',
         changesDetected: false,
       }
     }
 
-    // Log what we're trying to do
-    const modelToUse = selectedModel || 'claude-sonnet-4-5'
+    // Map UI model names to OpenRouter model names
+    // UI uses: claude-sonnet-4-5, claude-opus-4-5
+    // OpenRouter expects: anthropic/claude-sonnet-4.5, anthropic/claude-opus-4.5
+    const mapModelName = (model: string): string => {
+      const modelMappings: Record<string, string> = {
+        'claude-sonnet-4-5': 'anthropic/claude-sonnet-4.5',
+        'claude-opus-4-5': 'anthropic/claude-opus-4.5',
+        'claude-haiku-4-5': 'anthropic/claude-haiku-4.5',
+        'claude-sonnet-4.5': 'anthropic/claude-sonnet-4.5',
+        'claude-opus-4.5': 'anthropic/claude-opus-4.5',
+        'claude-haiku-4.5': 'anthropic/claude-haiku-4.5',
+        'claude-sonnet-4': 'anthropic/claude-4-sonnet',
+        'claude-4-sonnet': 'anthropic/claude-4-sonnet',
+      }
+      // Return mapped name or original if already in correct format
+      return modelMappings[model] || model
+    }
+
+    const modelToUse = mapModelName(selectedModel || 'claude-sonnet-4-5')
     if (logger) {
-      await logger.info('Attempting to execute Claude CLI...')
+      await logger.info(`Using model: ${modelToUse}`)
     }
 
     // Check MCP configuration status
-    const aiGatewayKey = process.env.AI_GATEWAY_API_KEY!
-    const aiGatewayBaseUrl = 'https://ai-gateway.vercel.sh'
-    const envPrefix = `ANTHROPIC_API_KEY="${aiGatewayKey}" ANTHROPIC_BASE_URL="${aiGatewayBaseUrl}"`
+    const openRouterKey = process.env.OPENROUTER_API_KEY!
+    const openRouterBaseUrl = 'https://openrouter.ai/api'
+    const envPrefix = `ANTHROPIC_API_KEY="" ANTHROPIC_BASE_URL="${openRouterBaseUrl}" ANTHROPIC_AUTH_TOKEN="${openRouterKey}" OPENROUTER_API_KEY="${openRouterKey}"`
     const mcpList = await runCommandInSandbox(sandbox, 'sh', ['-c', `${envPrefix} claude mcp list`])
     await logger.info('MCP servers list retrieved')
     if (mcpList.error) {
@@ -299,7 +331,7 @@ export async function executeClaudeInSandbox(
     }
 
     // Log the command we're about to execute (with redacted API key)
-    const redactedCommand = fullCommand.replace(aiGatewayKey, '[REDACTED]')
+    const redactedCommand = fullCommand.replace(openRouterKey, '[REDACTED]')
     await logger.command(redactedCommand)
 
     // Set up streaming output capture if we have an agent message
@@ -340,7 +372,7 @@ export async function executeClaudeInSandbox(
                         content: accumulatedContent,
                       })
                       .where(eq(taskMessages.id, agentMessageId))
-                      .then(() => {})
+                      .then(() => { })
                       .catch((err) => console.error('Failed to update message:', err))
                   }
                   // Handle tool use
@@ -380,7 +412,7 @@ export async function executeClaudeInSandbox(
                           content: accumulatedContent,
                         })
                         .where(eq(taskMessages.id, agentMessageId))
-                        .then(() => {})
+                        .then(() => { })
                         .catch((err) => console.error('Failed to update message:', err))
                     }
                   }

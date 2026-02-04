@@ -1,4 +1,5 @@
 import { generateText } from 'ai'
+import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 
 export interface CommitMessageOptions {
   description: string
@@ -9,8 +10,8 @@ export interface CommitMessageOptions {
 export async function generateCommitMessage(options: CommitMessageOptions): Promise<string> {
   const { description, repoName, context } = options
 
-  if (!process.env.AI_GATEWAY_API_KEY) {
-    throw new Error('AI_GATEWAY_API_KEY environment variable is required')
+  if (!process.env.OPENROUTER_API_KEY) {
+    throw new Error('OPENROUTER_API_KEY environment variable is required')
   }
 
   // Create the prompt for commit message generation
@@ -38,9 +39,14 @@ Examples of good commit messages:
 Return ONLY the commit message, nothing else.`
 
   try {
-    // Generate commit message using AI SDK 5 with AI Gateway
+    // Create OpenRouter instance
+    const openrouter = createOpenRouter({
+      apiKey: process.env.OPENROUTER_API_KEY,
+    })
+
+    // Generate commit message using AI SDK with OpenRouter
     const result = await generateText({
-      model: 'openai/gpt-5-nano',
+      model: openrouter('google/gemini-2.5-flash'), // Use a fast, cheap model for commit messages
       prompt,
       temperature: 0.3,
     })

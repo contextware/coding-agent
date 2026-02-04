@@ -76,22 +76,22 @@ export async function executeCodexInSandbox(
     }
 
     // Set up authentication - we'll use API key method since we're in a sandbox
-    if (!process.env.AI_GATEWAY_API_KEY) {
+    if (!process.env.OPENROUTER_API_KEY) {
       return {
         success: false,
-        error: 'AI Gateway API key not found. Please set AI_GATEWAY_API_KEY environment variable.',
+        error: 'OpenRouter API key not found. Please set OPENROUTER_API_KEY environment variable.',
         cliName: 'codex',
         changesDetected: false,
       }
     }
 
-    // Validate API key format - can be either OpenAI (sk-) or Vercel (vck_)
-    const apiKey = process.env.AI_GATEWAY_API_KEY
+    // Validate API key format
+    const apiKey = process.env.OPENROUTER_API_KEY
     const isOpenAIKey = apiKey?.startsWith('sk-')
-    const isVercelKey = apiKey?.startsWith('vck_')
+    const isOpenRouterKey = apiKey?.startsWith('sk-or-')
 
-    if (!apiKey || (!isOpenAIKey && !isVercelKey)) {
-      const errorMsg = `Invalid API key format. Expected to start with "sk-" (OpenAI) or "vck_" (Vercel), but got: "${apiKey?.substring(0, 15) || 'undefined'}"`
+    if (!apiKey || (!isOpenAIKey && !isOpenRouterKey)) {
+      const errorMsg = `Invalid API key format. Expected to start with "sk-" (OpenAI) or "sk-or-" (OpenRouter), but got: "${apiKey?.substring(0, 15) || 'undefined'}"`
 
       if (logger) {
         await logger.error(errorMsg)
@@ -105,8 +105,8 @@ export async function executeCodexInSandbox(
     }
 
     if (logger) {
-      const keyType = isVercelKey ? 'Vercel AI Gateway' : 'OpenAI'
-      await logger.info('Using API key for authentication')
+      const keyType = isOpenRouterKey ? 'OpenRouter' : (isOpenAIKey ? 'OpenAI' : 'Custom')
+      await logger.info(`Using ${keyType} API key for authentication`)
     }
 
     // According to the official Codex CLI docs, we should use 'exec' for non-interactive execution
@@ -149,16 +149,15 @@ export async function executeCodexInSandbox(
     // Use selectedModel if provided, otherwise fall back to default
     const modelToUse = selectedModel || 'openai/gpt-4o'
     let configToml
-    if (isVercelKey) {
-      // Use Vercel AI Gateway configuration for vck_ keys
-      // Based on the curl example, it uses /chat/completions endpoint, not responses
+    if (isOpenRouterKey || !isOpenAIKey) {
+      // Use OpenRouter configuration
       configToml = `model = "${modelToUse}"
-model_provider = "vercel-ai-gateway"
+model_provider = "openrouter"
 
-[model_providers.vercel-ai-gateway]
-name = "Vercel AI Gateway"
-base_url = "https://ai-gateway.vercel.sh/v1"
-env_key = "AI_GATEWAY_API_KEY"
+[model_providers.openrouter]
+name = "OpenRouter"
+base_url = "https://openrouter.ai/api/v1"
+env_key = "OPENROUTER_API_KEY"
 wire_api = "chat"
 
 # Debug settings
@@ -173,7 +172,7 @@ model_provider = "openai"
 [model_providers.openai]
 name = "OpenAI"
 base_url = "https://api.openai.com/v1"
-env_key = "AI_GATEWAY_API_KEY"
+env_key = "OPENROUTER_API_KEY"
 wire_api = "responses"
 
 # Debug settings
@@ -275,48 +274,37 @@ url = "${server.baseUrl}"
       await logger.info('Current working directory retrieved')
     }
 
-    // Use exec command with Vercel AI Gateway configuration
-    // The model is now configured in config.toml, so we can use it directly
-    // Use --dangerously-bypass-approvals-and-sandbox (no --cd flag like other agents)
-    // If resuming, use 'codex resume' instead of 'codex exec'
-    let codexCommand = 'codex exec --dangerously-bypass-approvals-and-sandbox'
+    // Prepare the command arguments
+    const args = isResumed
+      ? ['resume', '--last']
+      : ['exec', '--dangerously-bypass-approvals-and-sandbox']
 
-    if (isResumed) {
-      // Use resume command instead of exec
-      // Note: codex resume doesn't take session ID as an argument, it uses a picker or --last
-      // For now, we'll use --last to continue the most recent session
-      codexCommand = 'codex resume --last'
-      if (logger) {
-        await logger.info('Resuming previous Codex conversation')
-      }
+    if (isResumed && logger) {
+      await logger.info('Resuming previous Codex conversation')
     }
 
-    const logCommand = `${codexCommand} "${instruction}"`
-
+    const logCommand = `codex ${args.join(' ')} "${instruction.substring(0, 50)}..."`
     await logger.command(logCommand)
-    if (logger) {
-      await logger.command(logCommand)
-      const providerName = isVercelKey ? 'Vercel AI Gateway' : 'OpenAI API'
-      await logger.info(
-        `Executing Codex with model ${modelToUse} via ${providerName} and bypassed sandbox restrictions`,
-      )
+
+    const providerName = isOpenRouterKey ? 'OpenRouter' : 'OpenAI API'
+    await logger.info(
+      `Executing Codex with model ${modelToUse} via ${providerName} and bypassed sandbox restrictions`,
+    )
+
+    // Build environment variables for the command
+    const env = {
+      OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
+      HOME: '/home/vercel-sandbox',
+      CI: 'true',
     }
 
-    // Use the same pattern as other working agents (Claude, etc.)
-    // Execute with environment variables using sh -c like Claude does
-    const envPrefix = `AI_GATEWAY_API_KEY="${process.env.AI_GATEWAY_API_KEY}" HOME="/home/vercel-sandbox" CI="true"`
-    const fullCommand = `${envPrefix} ${codexCommand} "${instruction}"`
-
-    // Use the standard runInProject helper like other agents
-    const result = await runInProject(sandbox, 'sh', ['-c', fullCommand])
+    // Execute Codex CLI in the project directory
+    const result = await runInProject(sandbox, 'codex', args.concat(instruction), env)
 
     // Log the output and error results (similar to Claude and Cursor)
     if (result.output && result.output.trim()) {
       const redactedOutput = redactSensitiveInfo(result.output.trim())
       await logger.info(redactedOutput)
-      if (logger) {
-        await logger.info(redactedOutput)
-      }
     }
 
     if (!result.success && result.error && result.error.trim()) {

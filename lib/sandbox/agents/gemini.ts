@@ -1,4 +1,5 @@
 import { Sandbox } from '@vercel/sandbox'
+import { Writable } from 'stream'
 import { runCommandInSandbox, runInProject, PROJECT_DIR } from '../commands'
 import { AgentExecutionResult } from '../types'
 import { redactSensitiveInfo } from '@/lib/utils/logging'
@@ -175,28 +176,48 @@ EOF`
     const authEnv: Record<string, string> = {}
 
     // Option 1: Check for GEMINI_API_KEY (Gemini API)
-    if (process.env.GEMINI_API_KEY) {
+    // NOTE: The Gemini CLI does NOT support OpenRouter - it requires a direct Gemini API key
+    const geminiKey = process.env.GEMINI_API_KEY
+    if (geminiKey) {
       authMethod = 'api_key'
-      authEnv.GEMINI_API_KEY = process.env.GEMINI_API_KEY
-      await logger.info('Using Gemini API key authentication')
+      authEnv.GEMINI_API_KEY = geminiKey
+      // Log key format for debugging (without revealing the actual key)
+      const keyPrefix = geminiKey.substring(0, 4)
+      const keyLength = geminiKey.length
+      await logger.info(`Gemini API key detected (prefix: ${keyPrefix}..., length: ${keyLength})`)
+
+      // Validate key format - Google AI Studio keys start with "AIza"
+      if (!geminiKey.startsWith('AIza')) {
+        await logger.info(`WARNING: Gemini API key does not start with 'AIza' - may be invalid format`)
+      }
+
+      // Also write API key to Gemini config file for CLI to use
+      // The Gemini CLI may read from ~/.gemini/settings.json
+      const geminiConfigCmd = `mkdir -p ~/.gemini && echo '{"selectedAuthType":"API_KEY","apiKey":"${geminiKey}"}' > ~/.gemini/settings.json`
+      const configResult = await runCommandInSandbox(sandbox, 'sh', ['-c', geminiConfigCmd])
+      if (configResult.success) {
+        await logger.info('Gemini config file created with API key')
+      } else {
+        await logger.info('Warning: Failed to create Gemini config file')
+      }
     }
     // Option 2: Check for GOOGLE_API_KEY with Vertex AI flag (Vertex AI)
     else if (process.env.GOOGLE_API_KEY && process.env.GOOGLE_GENAI_USE_VERTEXAI) {
       authMethod = 'vertex_ai'
       authEnv.GOOGLE_API_KEY = process.env.GOOGLE_API_KEY
       authEnv.GOOGLE_GENAI_USE_VERTEXAI = 'true'
-      await logger.info('Using Vertex AI authentication')
+      await logger.info('Using Vertex AI auth')
     }
     // Option 3: Check for Google Cloud Project (OAuth with Code Assist)
     else if (process.env.GOOGLE_CLOUD_PROJECT) {
       authMethod = 'oauth_project'
       authEnv.GOOGLE_CLOUD_PROJECT = process.env.GOOGLE_CLOUD_PROJECT
-      await logger.info('Using Google Cloud Project authentication (requires OAuth login)')
+      await logger.info('Using Google Cloud Project auth (requires OAuth login)')
     }
     // Option 4: Default OAuth (will require interactive login)
     else {
       authMethod = 'oauth'
-      await logger.info('No API keys found, will attempt OAuth authentication')
+      await logger.info('WARNING: No GEMINI_API_KEY found - CLI will attempt OAuth which cannot work in sandbox')
     }
 
     // Prepare the command arguments using the correct Gemini CLI syntax
@@ -211,55 +232,106 @@ EOF`
     // Use YOLO mode to auto-approve all tools (bypass approval prompts)
     args.push('--yolo')
 
-    // Add output format for structured responses
-    args.push('-o', 'json')
+    // Use stream-json output for real-time streaming
+    args.push('-o', 'stream-json')
 
     // Don't add instruction to args array - we'll add it quoted separately to the command string
 
     // Log what we're trying to do
-    await logger.info('Executing Gemini CLI with authentication')
-    const redactedCommand = `gemini ${args.join(' ')} "${instruction.substring(0, 100)}..."`
+    await logger.info('Executing Gemini CLI in headless mode')
+    const redactedCommand = `gemini ${args.join(' ')} -p "${instruction.substring(0, 100)}..."`
     await logger.command(redactedCommand)
 
-    // Build environment variables string for shell command (like other agents)
-    const envPrefix = Object.entries(authEnv)
-      .map(([key, value]) => `${key}="${value}"`)
-      .join(' ')
+    // Build environment variables for the command
+    // IMPORTANT: Include PATH to ensure CLI tools can be found
+    const env: Record<string, string> = {
+      ...authEnv,
+      HOME: '/home/vercel-sandbox',
+      PATH: '/home/vercel-sandbox/.global/npm/bin:/home/vercel-sandbox/.global/pnpm/bin:/vercel/runtimes/node22/bin:/vercel/bin:/opt/git/bin:/home/vercel-sandbox/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin:/bin',
+      // CI mode to skip interactive prompts in tools like npm, create-next-app, etc.
+      CI: 'true',
+      // Disable npm update notifier which can hang
+      NO_UPDATE_NOTIFIER: 'true',
+      // Non-interactive npm
+      npm_config_yes: 'true',
+    }
 
-    // Try a simpler approach first - use gemini without complex flags
-    await logger.info('Attempting Gemini CLI execution with basic flags...')
+    // Set up streaming output capture
+    let capturedOutput = ''
+    const captureStdout = new Writable({
+      write(chunk, _encoding, callback) {
+        const text = chunk.toString()
+        capturedOutput += text
+        // Log to task logger immediately for real-time feedback
+        logger.info(text.trim()).catch(() => { })
+        callback()
+      },
+    })
 
-    // Execute Gemini CLI with proper environment using shell command
-    // IMPORTANT: Wrap instruction in quotes to prevent CLI option parsing issues
-    const fullCommand = envPrefix
-      ? `${envPrefix} gemini ${args.join(' ')} "${instruction}"`
-      : `gemini ${args.join(' ')} "${instruction}"`
-    let result = await runCommandInSandbox(sandbox, 'sh', ['-c', fullCommand])
+    let capturedStderr = ''
+    const captureStderr = new Writable({
+      write(chunk, _encoding, callback) {
+        const text = chunk.toString()
+        capturedStderr += text
+        // Log errors immediately too
+        logger.error(`[stderr] ${text.trim()}`).catch(() => { })
+        callback()
+      },
+    })
+
+    // Prepare full command string for shell execution in project directory
+    // IMPORTANT: Use -p/--prompt flag for non-interactive (headless) mode
+    // Without -p, the CLI runs in interactive mode and waits for user input
+    // Use single quotes to avoid issues with double quotes in the prompt
+    // Escape any single quotes in the instruction by ending the string, adding escaped quote, and starting new string
+    const escapedInstruction = instruction.replace(/'/g, "'\\''")
+    const fullCommand = `cd ${PROJECT_DIR} && gemini ${args.join(' ')} -p '${escapedInstruction}'`
+
+    // Execute Gemini CLI with streaming
+    await logger.info('Executing Gemini CLI in project directory with streaming...')
+    let result = await sandbox.runCommand({
+      cmd: 'sh',
+      args: ['-c', fullCommand],
+      env,
+      stdout: captureStdout,
+      stderr: captureStderr,
+    })
 
     // If that fails with tool registry error, try with different approval modes
-    if (!result.success && result.error?.includes('Tool') && result.error?.includes('not found in registry')) {
+    const initialError = typeof result.stderr === 'function' ? await result.stderr() : ''
+    if (result.exitCode !== 0 && initialError.includes('Tool') && initialError.includes('not found in registry')) {
       await logger.info('Retrying with auto_edit approval mode...')
       const fallbackArgs = []
       if (selectedModel) {
         fallbackArgs.push('-m', selectedModel)
       }
-      fallbackArgs.push('--approval-mode', 'auto_edit') // Auto-approve edit tools only
-      fallbackArgs.push('-o', 'text') // Use text output instead of JSON
-      // Don't add instruction to array - add it quoted separately
+      fallbackArgs.push('--approval-mode', 'auto_edit')
 
-      const fallbackCommand = envPrefix
-        ? `${envPrefix} gemini ${fallbackArgs.join(' ')} "${instruction}"`
-        : `gemini ${fallbackArgs.join(' ')} "${instruction}"`
-      result = await runCommandInSandbox(sandbox, 'sh', ['-c', fallbackCommand])
+      const fallbackCommand = `cd ${PROJECT_DIR} && gemini ${fallbackArgs.join(' ')} -p '${escapedInstruction}'`
+
+      result = await sandbox.runCommand({
+        cmd: 'sh',
+        args: ['-c', fallbackCommand],
+        env,
+        stdout: captureStdout,
+        stderr: captureStderr,
+      })
+
+      const secondError = typeof result.stderr === 'function' ? await result.stderr() : ''
 
       // If still failing, try the most basic approach
-      if (!result.success && result.error?.includes('Tool') && result.error?.includes('not found in registry')) {
+      if (result.exitCode !== 0 && secondError.includes('Tool') && secondError.includes('not found in registry')) {
         await logger.info('Retrying with minimal flags...')
         const minimalArgs = selectedModel ? ['-m', selectedModel] : []
-        const minimalCommand = envPrefix
-          ? `${envPrefix} gemini ${minimalArgs.join(' ')} "${instruction}"`
-          : `gemini ${minimalArgs.join(' ')} "${instruction}"`
-        result = await runCommandInSandbox(sandbox, 'sh', ['-c', minimalCommand])
+        const minimalCommand = `cd ${PROJECT_DIR} && gemini ${minimalArgs.join(' ')} -p '${escapedInstruction}'`
+
+        result = await sandbox.runCommand({
+          cmd: 'sh',
+          args: ['-c', minimalCommand],
+          env,
+          stdout: captureStdout,
+          stderr: captureStderr,
+        })
       }
     }
 
@@ -275,31 +347,30 @@ EOF`
       }
     }
 
+    // Capture final outputs for legacy return object compatibility
+    const finalStdout = typeof result.stdout === 'function' ? await result.stdout() : ''
+    const finalStderr = typeof result.stderr === 'function' ? await result.stderr() : ''
+    const isSuccess = result.exitCode === 0
+
     // Log the output
-    if (result.output && result.output.trim()) {
-      const redactedOutput = redactSensitiveInfo(result.output.trim())
+    if (finalStdout.trim()) {
+      const redactedOutput = redactSensitiveInfo(finalStdout.trim())
       await logger.info(redactedOutput)
     }
 
-    if (!result.success && result.error) {
-      const redactedError = redactSensitiveInfo(result.error)
+    if (!isSuccess && finalStderr.trim()) {
+      const redactedError = redactSensitiveInfo(finalStderr.trim())
       await logger.error(redactedError)
     }
 
     // Log more details for debugging
     await logger.info('Gemini CLI execution completed')
-    if (result.output) {
-      await logger.info('Gemini CLI output available')
-    }
-    if (result.error) {
-      await logger.error('Gemini CLI error occurred')
-    }
 
     // Check if any files were modified
     const gitStatusCheck = await runAndLogCommand(sandbox, 'git', ['status', '--porcelain'], logger)
     const hasChanges = gitStatusCheck.success && gitStatusCheck.output?.trim()
 
-    if (result.success || result.exitCode === 0) {
+    if (isSuccess) {
       // Log additional debugging info if no changes were made
       if (!hasChanges) {
         await logger.info('No changes detected. Checking if files exist...')
@@ -311,29 +382,29 @@ EOF`
       return {
         success: true,
         output: `Gemini CLI executed successfully${hasChanges ? ' (Changes detected)' : ' (No changes made)'}`,
-        agentResponse: result.output || 'No detailed response available',
+        agentResponse: finalStdout || 'No detailed response available',
         cliName: 'gemini',
         changesDetected: !!hasChanges,
         error: undefined,
       }
     } else {
       // Handle specific error types
-      if (result.error?.includes('authentication') || result.error?.includes('login')) {
+      if (finalStderr.includes('authentication') || finalStderr.includes('login')) {
         return {
           success: false,
-          error: `Gemini CLI authentication failed. Please set GEMINI_API_KEY, GOOGLE_API_KEY (with GOOGLE_GENAI_USE_VERTEXAI=true), or GOOGLE_CLOUD_PROJECT environment variable. Error: ${result.error}`,
-          agentResponse: result.output,
+          error: `Gemini CLI authentication failed. Please set GEMINI_API_KEY, GOOGLE_API_KEY (with GOOGLE_GENAI_USE_VERTEXAI=true), or GOOGLE_CLOUD_PROJECT environment variable. Error: ${finalStderr}`,
+          agentResponse: finalStdout,
           cliName: 'gemini',
           changesDetected: !!hasChanges,
         }
       }
 
       // Handle tool registry errors (common in sandbox environments)
-      if (result.error?.includes('Tool') && result.error?.includes('not found in registry')) {
+      if (finalStderr.includes('Tool') && finalStderr.includes('not found in registry')) {
         return {
           success: false,
-          error: `Gemini CLI tool registry error - this may be due to sandbox environment limitations. The Gemini CLI may have restricted file operation capabilities in this environment. Consider using a different agent for file modifications. Error: ${result.error}`,
-          agentResponse: result.output,
+          error: `Gemini CLI tool registry error - this may be due to sandbox environment limitations. The Gemini CLI may have restricted file operation capabilities in this environment. Consider using a different agent for file modifications. Error: ${finalStderr}`,
+          agentResponse: finalStdout,
           cliName: 'gemini',
           changesDetected: !!hasChanges,
         }
@@ -341,8 +412,8 @@ EOF`
 
       return {
         success: false,
-        error: `Gemini CLI failed (exit code ${result.exitCode}): ${result.error || 'No error message'}`,
-        agentResponse: result.output,
+        error: `Gemini CLI failed (exit code ${result.exitCode}): ${finalStderr || 'No error message'}`,
+        agentResponse: finalStdout,
         cliName: 'gemini',
         changesDetected: !!hasChanges,
       }

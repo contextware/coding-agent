@@ -129,7 +129,7 @@ async function continueTask(
     GEMINI_API_KEY?: string
     CURSOR_API_KEY?: string
     ANTHROPIC_API_KEY?: string
-    AI_GATEWAY_API_KEY?: string
+    OPENROUTER_API_KEY?: string
   },
   githubToken?: string | null,
   githubUser?: {
@@ -172,9 +172,9 @@ async function continueTask(
         console.log('Calling Sandbox.get with sandboxId:', currentTask.sandboxId)
         const reconnectedSandbox = await Sandbox.get({
           sandboxId: currentTask.sandboxId,
-          teamId: process.env.SANDBOX_VERCEL_TEAM_ID!,
-          projectId: process.env.SANDBOX_VERCEL_PROJECT_ID!,
-          token: process.env.SANDBOX_VERCEL_TOKEN!,
+          teamId: process.env.VERCEL_TEAM_ID!,
+          projectId: process.env.VERCEL_PROJECT_ID!,
+          token: process.env.VERCEL_TOKEN!,
         })
 
         if (reconnectedSandbox) {
@@ -257,11 +257,7 @@ async function continueTask(
 
     // Build conversation history context - put the new request FIRST, then context
     // Sanitize the current prompt to prevent CLI option parsing issues
-    const sanitizedPrompt = prompt
-      .replace(/`/g, "'") // Replace backticks with single quotes
-      .replace(/\$/g, '') // Remove dollar signs
-      .replace(/\\/g, '') // Remove backslashes
-      .replace(/^-/gm, ' -') // Prefix lines starting with dash to avoid CLI option parsing
+    const sanitizedPrompt = prompt.replace(/^-/gm, ' -') // Prefix lines starting with dash to avoid CLI option parsing
 
     let promptWithContext = sanitizedPrompt
     // Only add conversation history if NOT using a resumed sandbox
@@ -273,11 +269,7 @@ async function continueTask(
         // Escape special characters and limit length to avoid shell parsing issues
         const truncatedContent = msg.content.length > 500 ? msg.content.substring(0, 500) + '...' : msg.content
         // Remove problematic characters that could cause shell parsing issues
-        const sanitizedContent = truncatedContent
-          .replace(/`/g, "'") // Replace backticks with single quotes
-          .replace(/\$/g, '') // Remove dollar signs
-          .replace(/\\/g, '') // Remove backslashes
-          .replace(/^-/gm, ' -') // Prefix lines starting with dash to avoid CLI option parsing
+        const sanitizedContent = truncatedContent.replace(/^-/gm, ' -') // Prefix lines starting with dash to avoid CLI option parsing
         conversationHistory += `${role}: ${sanitizedContent}\n\n`
       })
       promptWithContext = `${sanitizedPrompt}${conversationHistory}`
@@ -378,7 +370,7 @@ async function continueTask(
           // Ignore URL parsing errors
         }
 
-        if (process.env.AI_GATEWAY_API_KEY) {
+        if (process.env.OPENROUTER_API_KEY) {
           commitMessage = await generateCommitMessage({
             description: prompt,
             repoName,

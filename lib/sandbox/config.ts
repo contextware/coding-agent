@@ -6,40 +6,58 @@ export function validateEnvironmentVariables(
     GEMINI_API_KEY?: string
     CURSOR_API_KEY?: string
     ANTHROPIC_API_KEY?: string
-    AI_GATEWAY_API_KEY?: string
+    OPENROUTER_API_KEY?: string
   },
 ) {
   const errors: string[] = []
 
-  // Check for required environment variables based on selected agent
-  if (selectedAgent === 'claude' && !apiKeys?.AI_GATEWAY_API_KEY && !process.env.AI_GATEWAY_API_KEY) {
-    errors.push('AI_GATEWAY_API_KEY is required for Claude CLI. Please add your API key in your profile.')
+  // Check for required API keys based on selected agent
+  // Each agent has different API key requirements
+
+  if (selectedAgent === 'claude') {
+    // Claude uses OpenRouter as an Anthropic-compatible API
+    const hasOpenRouter = apiKeys?.OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY
+    if (!hasOpenRouter) {
+      errors.push('OPENROUTER_API_KEY is required for Claude CLI. Please add your API key in your profile.')
+    }
   }
 
-  if (selectedAgent === 'cursor' && !apiKeys?.CURSOR_API_KEY && !process.env.CURSOR_API_KEY) {
-    errors.push('CURSOR_API_KEY is required for Cursor CLI. Please add your API key in your profile.')
+  if (selectedAgent === 'codex') {
+    // Codex uses OpenRouter
+    const hasOpenRouter = apiKeys?.OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY
+    if (!hasOpenRouter) {
+      errors.push('OPENROUTER_API_KEY is required for Codex CLI. Please add your API key in your profile.')
+    }
   }
 
-  if (selectedAgent === 'codex' && !apiKeys?.AI_GATEWAY_API_KEY && !process.env.AI_GATEWAY_API_KEY) {
-    errors.push('AI_GATEWAY_API_KEY is required for Codex CLI. Please add your API key in your profile.')
+  if (selectedAgent === 'gemini') {
+    // Gemini CLI requires native GEMINI_API_KEY (does not work with OpenRouter)
+    const hasGemini = apiKeys?.GEMINI_API_KEY || process.env.GEMINI_API_KEY
+    if (!hasGemini) {
+      errors.push('GEMINI_API_KEY is required for Gemini CLI. Please add your API key in your profile.')
+    }
   }
 
-  if (selectedAgent === 'gemini' && !apiKeys?.GEMINI_API_KEY && !process.env.GEMINI_API_KEY) {
-    errors.push('GEMINI_API_KEY is required for Gemini CLI. Please add your API key in your profile.')
+  if (selectedAgent === 'cursor') {
+    // Cursor requires its own API key
+    const hasCursor = apiKeys?.CURSOR_API_KEY || process.env.CURSOR_API_KEY
+    if (!hasCursor) {
+      errors.push('CURSOR_API_KEY is required for Cursor CLI. Please add your API key in your profile.')
+    }
   }
 
   if (selectedAgent === 'opencode') {
-    // OpenCode can use either AI Gateway (for GPT models) or Anthropic (for Claude models)
-    // We require at least one to be present
-    const hasAiGateway = apiKeys?.AI_GATEWAY_API_KEY || process.env.AI_GATEWAY_API_KEY
+    // OpenCode can use either OpenRouter (for GPT/Claude models) or Anthropic directly
+    const hasOpenRouter = apiKeys?.OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY
     const hasAnthropic = apiKeys?.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY
-
-    if (!hasAiGateway && !hasAnthropic) {
+    if (!hasOpenRouter && !hasAnthropic) {
       errors.push(
-        'Either AI_GATEWAY_API_KEY or ANTHROPIC_API_KEY is required for OpenCode CLI. Please add at least one API key in your profile.',
+        'Either OPENROUTER_API_KEY or ANTHROPIC_API_KEY is required for OpenCode CLI. Please add at least one API key in your profile.',
       )
     }
   }
+
+  // Note: Copilot uses GitHub token for authentication, no separate API key needed
 
   // Check for GitHub token for private repositories
   // Use user's token if provided
@@ -48,16 +66,16 @@ export function validateEnvironmentVariables(
   }
 
   // Check for Vercel sandbox environment variables
-  if (!process.env.SANDBOX_VERCEL_TEAM_ID) {
-    errors.push('SANDBOX_VERCEL_TEAM_ID is required for sandbox creation')
+  if (!process.env.VERCEL_TEAM_ID) {
+    errors.push('VERCEL_TEAM_ID is required for sandbox creation')
   }
 
-  if (!process.env.SANDBOX_VERCEL_PROJECT_ID) {
-    errors.push('SANDBOX_VERCEL_PROJECT_ID is required for sandbox creation')
+  if (!process.env.VERCEL_PROJECT_ID) {
+    errors.push('VERCEL_PROJECT_ID is required for sandbox creation')
   }
 
-  if (!process.env.SANDBOX_VERCEL_TOKEN) {
-    errors.push('SANDBOX_VERCEL_TOKEN is required for sandbox creation')
+  if (!process.env.VERCEL_TOKEN) {
+    errors.push('VERCEL_TOKEN is required for sandbox creation')
   }
 
   return {

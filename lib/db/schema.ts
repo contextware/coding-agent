@@ -84,7 +84,7 @@ export const tasks = pgTable('tasks', {
   selectedAgent: text('selected_agent').default('claude'),
   selectedModel: text('selected_model'),
   installDependencies: boolean('install_dependencies').default(false),
-  maxDuration: integer('max_duration').default(parseInt(process.env.MAX_SANDBOX_DURATION || '300', 10)),
+  maxDuration: integer('max_duration').default(parseInt(process.env.MAX_SANDBOX_DURATION || '45', 10)),
   keepAlive: boolean('keep_alive').default(false),
   enableBrowser: boolean('enable_browser').default(false),
   status: text('status', {
@@ -123,7 +123,7 @@ export const insertTaskSchema = z.object({
   selectedAgent: z.enum(['claude', 'codex', 'copilot', 'cursor', 'gemini', 'opencode']).default('claude'),
   selectedModel: z.string().optional(),
   installDependencies: z.boolean().default(false),
-  maxDuration: z.number().default(parseInt(process.env.MAX_SANDBOX_DURATION || '300', 10)),
+  maxDuration: z.number().default(parseInt(process.env.MAX_SANDBOX_DURATION || '45', 10)),
   keepAlive: z.boolean().default(false),
   enableBrowser: z.boolean().default(false),
   status: z.enum(['pending', 'processing', 'completed', 'error', 'stopped']).default('pending'),
@@ -323,7 +323,7 @@ export const keys = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }), // Foreign key to users table
     provider: text('provider', {
-      enum: ['anthropic', 'openai', 'cursor', 'gemini', 'aigateway'],
+      enum: ['anthropic', 'openai', 'cursor', 'gemini', 'openrouter'],
     }).notNull(),
     value: text('value').notNull(), // Encrypted API key value
     createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -338,7 +338,7 @@ export const keys = pgTable(
 export const insertKeySchema = z.object({
   id: z.string().optional(),
   userId: z.string(),
-  provider: z.enum(['anthropic', 'openai', 'cursor', 'gemini', 'aigateway']),
+  provider: z.enum(['anthropic', 'openai', 'cursor', 'gemini', 'openrouter']),
   value: z.string().min(1, 'API key value is required'),
   createdAt: z.date().optional(),
   updatedAt: z.date().optional(),
@@ -347,7 +347,7 @@ export const insertKeySchema = z.object({
 export const selectKeySchema = z.object({
   id: z.string(),
   userId: z.string(),
-  provider: z.enum(['anthropic', 'openai', 'cursor', 'gemini', 'aigateway']),
+  provider: z.enum(['anthropic', 'openai', 'cursor', 'gemini', 'openrouter']),
   value: z.string(),
   createdAt: z.date(),
   updatedAt: z.date(),

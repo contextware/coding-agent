@@ -80,9 +80,9 @@ export async function createSandbox(config: SandboxConfig, logger: TaskLogger): 
 
     // Create sandbox without source - we'll clone manually to /vercel/sandbox/project
     const sandboxConfig = {
-      teamId: process.env.SANDBOX_VERCEL_TEAM_ID!,
-      projectId: process.env.SANDBOX_VERCEL_PROJECT_ID!,
-      token: process.env.SANDBOX_VERCEL_TOKEN!,
+      teamId: process.env.VERCEL_TEAM_ID!,
+      projectId: process.env.VERCEL_PROJECT_ID!,
+      token: process.env.VERCEL_TOKEN!,
       timeout: timeoutMs,
       ports: defaultPorts,
       runtime: config.runtime || 'node22',

@@ -22,9 +22,14 @@ export async function runCommandInSandbox(
   sandbox: Sandbox,
   command: string,
   args: string[] = [],
+  env?: Record<string, string>,
 ): Promise<CommandResult> {
   try {
-    const result = await sandbox.runCommand(command, args)
+    const result = await sandbox.runCommand({
+      cmd: command,
+      args,
+      env,
+    })
 
     // Handle stdout and stderr properly
     let stdout = ''
@@ -63,7 +68,12 @@ export async function runCommandInSandbox(
 }
 
 // Helper function to run command in project directory
-export async function runInProject(sandbox: Sandbox, command: string, args: string[] = []): Promise<CommandResult> {
+export async function runInProject(
+  sandbox: Sandbox,
+  command: string,
+  args: string[] = [],
+  env?: Record<string, string>,
+): Promise<CommandResult> {
   // Properly escape arguments for shell execution
   const escapeArg = (arg: string) => {
     // Escape single quotes by replacing ' with '\''
@@ -72,7 +82,7 @@ export async function runInProject(sandbox: Sandbox, command: string, args: stri
 
   const fullCommand = args.length > 0 ? `${command} ${args.map(escapeArg).join(' ')}` : command
   const cdCommand = `cd ${PROJECT_DIR} && ${fullCommand}`
-  return await runCommandInSandbox(sandbox, 'sh', ['-c', cdCommand])
+  return await runCommandInSandbox(sandbox, 'sh', ['-c', cdCommand], env)
 }
 
 export async function runStreamingCommandInSandbox(
@@ -80,9 +90,14 @@ export async function runStreamingCommandInSandbox(
   command: string,
   args: string[] = [],
   options: StreamingCommandOptions = {},
+  env?: Record<string, string>,
 ): Promise<CommandResult> {
   try {
-    const result = await sandbox.runCommand(command, args)
+    const result = await sandbox.runCommand({
+      cmd: command,
+      args,
+      env,
+    })
 
     let stdout = ''
     let stderr = ''
