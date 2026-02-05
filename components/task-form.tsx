@@ -47,6 +47,7 @@ interface TaskFormProps {
     maxDuration: number
     keepAlive: boolean
     enableBrowser: boolean
+    initWithBetterAgents: boolean
   }) => void
   isSubmitting: boolean
   selectedOwner: string
@@ -55,6 +56,7 @@ interface TaskFormProps {
   initialMaxDuration?: number
   initialKeepAlive?: boolean
   initialEnableBrowser?: boolean
+  initialInitWithBetterAgents?: boolean
   maxSandboxDuration?: number
 }
 
@@ -165,6 +167,7 @@ export function TaskForm({
   initialMaxDuration = 45,
   initialKeepAlive = false,
   initialEnableBrowser = false,
+  initialInitWithBetterAgents = false,
   maxSandboxDuration = 45,
 }: TaskFormProps) {
   const [prompt, setPrompt] = useAtom(taskPromptAtom)
@@ -180,6 +183,7 @@ export function TaskForm({
   const [maxDuration, setMaxDurationState] = useState(initialMaxDuration)
   const [keepAlive, setKeepAliveState] = useState(initialKeepAlive)
   const [enableBrowser, setEnableBrowserState] = useState(initialEnableBrowser)
+  const [initWithBetterAgents, setInitWithBetterAgents] = useState(initialInitWithBetterAgents)
   const [showMcpServersDialog, setShowMcpServersDialog] = useState(false)
 
   // Connectors state
@@ -347,6 +351,7 @@ export function TaskForm({
         maxDuration,
         keepAlive,
         enableBrowser,
+        initWithBetterAgents,
       })
       return
     }
@@ -392,6 +397,7 @@ export function TaskForm({
       maxDuration,
       keepAlive,
       enableBrowser,
+      initWithBetterAgents,
     })
   }
 
@@ -749,6 +755,24 @@ export function TaskForm({
                               </Label>
                             </div>
                             <p className="text-xs text-muted-foreground pl-6">Keep sandbox running after completion.</p>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id="better-agents"
+                                checked={initWithBetterAgents}
+                                onCheckedChange={(checked) => setInitWithBetterAgents(checked === true)}
+                              />
+                              <Label
+                                htmlFor="better-agents"
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                              >
+                                Initialize with Better Agents
+                              </Label>
+                            </div>
+                            <p className="text-xs text-muted-foreground pl-6">
+                              Agent will set up LangWatch instrumentation and project structure.
+                            </p>
                           </div>
                         </div>
                       </DropdownMenuContent>

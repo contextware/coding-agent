@@ -18,6 +18,10 @@ import { checkRateLimit } from '@/lib/utils/rate-limit'
 import { getMaxSandboxDuration } from '@/lib/db/settings'
 import { generateCommitMessage, createFallbackCommitMessage } from '@/lib/utils/commit-message-generator'
 import { detectPortFromRepo } from '@/lib/sandbox/port-detection'
+import {
+  enhancePromptWithBetterAgentsGuidance,
+  type BetterAgentsConfig,
+} from '@/lib/utils/better-agents-guidance'
 
 export async function POST(req: NextRequest, context: { params: Promise<{ taskId: string }> }) {
   try {
@@ -44,6 +48,14 @@ export async function POST(req: NextRequest, context: { params: Promise<{ taskId
     const { taskId } = await context.params
     const body = await req.json()
     const { message } = body
+
+    // Extract Better Agents configuration (for follow-up messages that enable it)
+    const betterAgentsConfig: BetterAgentsConfig = {
+      enabled: body.initWithBetterAgents || false,
+      goal: body.betterAgentsGoal,
+      skills: body.betterAgentsSkills,
+      langwatchEndpoint: body.betterAgentsLangWatchEndpoint,
+    }
 
     if (!message || typeof message !== 'string' || !message.trim()) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 })
@@ -105,6 +117,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ taskId
         userApiKeys,
         userGithubToken,
         githubUser,
+        betterAgentsConfig,
       )
     })
 
@@ -137,6 +150,7 @@ async function continueTask(
     name: string | null
     email: string | null
   } | null,
+  betterAgentsConfig?: BetterAgentsConfig,
 ) {
   let sandbox: Sandbox | null = null
   let isResumedSandbox = false // Track if we reconnected to existing sandbox
@@ -218,6 +232,11 @@ async function continueTask(
           selectedModel,
           installDependencies,
           preDeterminedBranchName: branchName, // Use existing branch
+          // Better Agents configuration
+          initWithBetterAgents: betterAgentsConfig?.enabled,
+          betterAgentsGoal: betterAgentsConfig?.goal,
+          betterAgentsSkills: betterAgentsConfig?.skills,
+          betterAgentsLangWatchEndpoint: betterAgentsConfig?.langwatchEndpoint,
           onProgress: async (progress: number, message: string) => {
             await logger.updateProgress(progress, message)
           },
@@ -273,6 +292,12 @@ async function continueTask(
         conversationHistory += `${role}: ${sanitizedContent}\n\n`
       })
       promptWithContext = `${sanitizedPrompt}${conversationHistory}`
+    }
+
+    // Enhance prompt with Better Agents guidance if enabled
+    if (betterAgentsConfig?.enabled) {
+      promptWithContext = enhancePromptWithBetterAgentsGuidance(promptWithContext, betterAgentsConfig)
+      await logger.info('Better Agents guidance added to prompt')
     }
 
     type Connector = typeof connectors.$inferSelect

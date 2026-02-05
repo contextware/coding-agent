@@ -336,6 +336,7 @@ export function HomePageContent({
     maxDuration: number
     keepAlive: boolean
     enableBrowser: boolean
+    initWithBetterAgents: boolean
   }) => {
     // Check if user is authenticated
     if (!user) {
@@ -390,6 +391,7 @@ export function HomePageContent({
           maxDuration: data.maxDuration,
           keepAlive: data.keepAlive,
           enableBrowser: data.enableBrowser,
+          initWithBetterAgents: data.initWithBetterAgents,
         }
       })
 
@@ -464,6 +466,7 @@ export function HomePageContent({
           maxDuration: data.maxDuration,
           keepAlive: data.keepAlive,
           enableBrowser: data.enableBrowser,
+          initWithBetterAgents: data.initWithBetterAgents,
         }
       })
 

@@ -29,6 +29,14 @@ export interface SandboxConfig {
   preDeterminedBranchName?: string
   onProgress?: (progress: number, message: string) => Promise<void>
   onCancellationCheck?: () => Promise<boolean>
+  /** Initialize project with @contextware/better-agents CLI */
+  initWithBetterAgents?: boolean
+  /** Project goal for better-agents init (--goal flag) */
+  betterAgentsGoal?: string
+  /** Skills to install with better-agents (comma-separated or 'all') */
+  betterAgentsSkills?: string
+  /** Custom LangWatch endpoint URL for better-agents */
+  betterAgentsLangWatchEndpoint?: string
 }
 
 export interface SandboxResult {

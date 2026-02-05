@@ -771,6 +771,66 @@ SKILL_EOF`
       }
     }
 
+    // Initialize project with Better Agents CLI for proper guidance and structure
+    if (config.initWithBetterAgents) {
+      await logger.info('Initializing project with Better Agents...')
+
+      // Install better-agents CLI globally
+      const installBetterAgents = await runCommandInSandbox(sandbox, 'npm', [
+        'install',
+        '-g',
+        '@contextware/better-agents',
+      ])
+
+      if (!installBetterAgents.success) {
+        await logger.info('Warning: Failed to install better-agents CLI')
+      } else {
+        await logger.info('better-agents CLI installed')
+
+        // Build the better-agents init command with options
+        const initArgs: string[] = ['.']
+
+        // Add goal if provided
+        if (config.betterAgentsGoal) {
+          initArgs.push('--goal', config.betterAgentsGoal)
+        }
+
+        // Add skills if provided (comma-separated list or 'all')
+        if (config.betterAgentsSkills) {
+          initArgs.push('--skills', config.betterAgentsSkills)
+        }
+
+        // Add LangWatch endpoint if provided
+        if (config.betterAgentsLangWatchEndpoint) {
+          initArgs.push('--langwatch-endpoint', config.betterAgentsLangWatchEndpoint)
+        }
+
+        // Map selected agent to better-agents coding assistant option
+        const agentToCodingAssistant: Record<string, string> = {
+          claude: 'claude-code',
+          gemini: 'gemini-cli',
+          cursor: 'cursor',
+          copilot: 'copilot',
+          opencode: 'opencode',
+          codex: 'codex',
+        }
+        const codingAssistant = agentToCodingAssistant[config.selectedAgent || 'claude']
+        if (codingAssistant) {
+          initArgs.push('--coding-assistant', codingAssistant)
+        }
+
+        // Run better-agents init in the project directory
+        await logger.info('Running better-agents init...')
+        const betterAgentsInit = await runInProject(sandbox, 'better-agents', ['init', ...initArgs])
+
+        if (betterAgentsInit.success) {
+          await logger.info('Better Agents initialized successfully')
+        } else {
+          await logger.info('Warning: Failed to initialize Better Agents')
+        }
+      }
+    }
+
     // Configure Git user
     const gitName = config.gitAuthorName || 'Coding Agent'
     const gitEmail = config.gitAuthorEmail || 'agent@example.com'
