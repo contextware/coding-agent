@@ -22,6 +22,10 @@ import { getGitHubUser } from '@/lib/github/client'
 import { getUserApiKeys } from '@/lib/api-keys/user-keys'
 import { checkRateLimit } from '@/lib/utils/rate-limit'
 import { getMaxSandboxDuration } from '@/lib/db/settings'
+import {
+  enhancePromptWithBetterAgentsGuidance,
+  type BetterAgentsConfig,
+} from '@/lib/utils/better-agents-guidance'
 
 export async function GET() {
   try {
@@ -69,6 +73,14 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+
+    // Extract Better Agents configuration (not part of task schema)
+    const betterAgentsConfig: BetterAgentsConfig = {
+      enabled: body.initWithBetterAgents || false,
+      goal: body.betterAgentsGoal,
+      skills: body.betterAgentsSkills,
+      langwatchEndpoint: body.betterAgentsLangWatchEndpoint,
+    }
 
     // Use provided ID or generate a new one
     const taskId = body.id || generateId(12)
@@ -235,6 +247,7 @@ export async function POST(request: NextRequest) {
           userApiKeys,
           userGithubToken,
           githubUser,
+          betterAgentsConfig,
         )
       } catch (error) {
         console.error('Task processing failed:', error)
@@ -272,6 +285,7 @@ async function processTaskWithTimeout(
     name: string | null
     email: string | null
   } | null,
+  betterAgentsConfig?: BetterAgentsConfig,
 ) {
   const TASK_TIMEOUT_MS = maxDuration * 60 * 1000 // Convert minutes to milliseconds
 
@@ -464,6 +478,11 @@ async function processTask(
         keepAlive,
         enableBrowser,
         preDeterminedBranchName: aiBranchName || undefined,
+        // Better Agents configuration
+        initWithBetterAgents: betterAgentsConfig?.enabled,
+        betterAgentsGoal: betterAgentsConfig?.goal,
+        betterAgentsSkills: betterAgentsConfig?.skills,
+        betterAgentsLangWatchEndpoint: betterAgentsConfig?.langwatchEndpoint,
         onProgress: async (progress: number, message: string) => {
           // Use real-time logger for progress updates
           await logger.updateProgress(progress, message)
@@ -578,7 +597,13 @@ async function processTask(
     }
 
     // Sanitize prompt to prevent CLI option parsing issues
-    const sanitizedPrompt = prompt.replace(/^-/gm, ' -') // Prefix lines starting with dash to avoid CLI option parsing
+    let sanitizedPrompt = prompt.replace(/^-/gm, ' -') // Prefix lines starting with dash to avoid CLI option parsing
+
+    // Enhance prompt with Better Agents guidance if enabled
+    if (betterAgentsConfig?.enabled) {
+      sanitizedPrompt = enhancePromptWithBetterAgentsGuidance(sanitizedPrompt, betterAgentsConfig)
+      await logger.info('Better Agents guidance added to prompt')
+    }
 
     // Generate agent message ID for streaming updates
     const agentMessageId = generateId()
