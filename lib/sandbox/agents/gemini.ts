@@ -263,7 +263,7 @@ EOF`
         const text = chunk.toString()
         capturedOutput += text
         // Log to task logger immediately for real-time feedback
-        logger.info(text.trim()).catch(() => { })
+        logger.info(text.trim()).catch(() => {})
         callback()
       },
     })
@@ -274,7 +274,7 @@ EOF`
         const text = chunk.toString()
         capturedStderr += text
         // Log errors immediately too
-        logger.error(`[stderr] ${text.trim()}`).catch(() => { })
+        logger.error(`[stderr] ${text.trim()}`).catch(() => {})
         callback()
       },
     })

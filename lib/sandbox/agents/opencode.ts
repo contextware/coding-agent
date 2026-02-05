@@ -57,8 +57,12 @@ export async function executeOpenCodeInSandbox(
     await logger.info('Starting OpenCode agent execution...')
 
     // Check if we have required environment variables for OpenCode
-    if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
-      const errorMsg = 'OpenAI API key or Anthropic API key is required for OpenCode agent'
+    const hasOpenRouter = process.env.OPENROUTER_API_KEY
+    const hasOpenAI = process.env.OPENAI_API_KEY
+    const hasAnthropic = process.env.ANTHROPIC_API_KEY
+
+    if (!hasOpenAI && !hasAnthropic && !hasOpenRouter) {
+      const errorMsg = 'OpenAI API key, Anthropic API key, or OpenRouter API key is required for OpenCode agent'
       await logger.error(errorMsg)
       return {
         success: false,
@@ -299,12 +303,109 @@ EOF`
       }
     }
 
-    // Set up environment variables for the OpenCode execution
+    // Map UI model names to OpenCode provider/model format
+    // When using OpenRouter, use the 'openrouter' provider with OpenRouter model slugs
+    // When using native APIs, use 'anthropic' or 'openai' providers with official model names
+    const mapModelName = (modelValues: string): string => {
+      const isOpenRouter =
+        process.env.OPENROUTER_API_KEY ||
+        process.env.OPENAI_API_BASE?.includes('openrouter.ai') ||
+        process.env.OPENAI_BASE_URL?.includes('openrouter.ai')
+
+      // OpenRouter slug mappings (for openrouter provider)
+      const openRouterSlugMappings: Record<string, string> = {
+        'claude-sonnet-4-5': 'anthropic/claude-sonnet-4.5',
+        'claude-opus-4-5': 'anthropic/claude-opus-4.5',
+        'claude-sonnet-4-20250514': 'anthropic/claude-sonnet-4-20250514',
+        'claude-opus-4-20250514': 'anthropic/claude-opus-4-20250514',
+        'claude-3-5-sonnet-20241022': 'anthropic/claude-3.5-sonnet',
+        'claude-3-opus-20240229': 'anthropic/claude-3-opus',
+        'claude-3-sonnet-20240229': 'anthropic/claude-3-sonnet',
+        'claude-3-haiku-20240307': 'anthropic/claude-3-haiku',
+        'gpt-4o': 'openai/gpt-4o',
+        'gpt-4o-mini': 'openai/gpt-4o-mini',
+        'gpt-4-turbo': 'openai/gpt-4-turbo',
+        'gpt-4': 'openai/gpt-4',
+        'gpt-3.5-turbo': 'openai/gpt-3.5-turbo',
+        'gpt-5': 'openai/gpt-4o',
+      }
+
+      // Native API model mappings (for anthropic/openai providers)
+      const nativeModelMappings: Record<string, string> = {
+        'claude-sonnet-4-5': 'anthropic/claude-sonnet-4-20250514',
+        'claude-opus-4-5': 'anthropic/claude-opus-4-20250514',
+        'claude-sonnet-4-20250514': 'anthropic/claude-sonnet-4-20250514',
+        'claude-opus-4-20250514': 'anthropic/claude-opus-4-20250514',
+        'claude-3-5-sonnet-20241022': 'anthropic/claude-3-5-sonnet-20241022',
+        'claude-3-opus-20240229': 'anthropic/claude-3-opus-20240229',
+        'claude-3-sonnet-20240229': 'anthropic/claude-3-sonnet-20240229',
+        'claude-3-haiku-20240307': 'anthropic/claude-3-haiku-20240307',
+        'gpt-4o': 'openai/gpt-4o',
+        'gpt-4o-mini': 'openai/gpt-4o-mini',
+        'gpt-4-turbo': 'openai/gpt-4-turbo',
+        'gpt-4': 'openai/gpt-4',
+        'gpt-3.5-turbo': 'openai/gpt-3.5-turbo',
+        'gpt-5': 'openai/gpt-4o',
+      }
+
+      if (isOpenRouter) {
+        // Use openrouter provider with OpenRouter model slugs
+        const slug = openRouterSlugMappings[modelValues]
+        if (slug) {
+          return `openrouter/${slug}`
+        }
+        // If already has prefix, add openrouter/ in front
+        if (modelValues.includes('/')) {
+          return `openrouter/${modelValues}`
+        }
+        // Fallback: add appropriate prefix
+        if (modelValues.startsWith('claude-') || modelValues.includes('sonnet') || modelValues.includes('opus') || modelValues.includes('haiku')) {
+          return `openrouter/anthropic/${modelValues}`
+        }
+        if (modelValues.startsWith('gpt-')) {
+          return `openrouter/openai/${modelValues}`
+        }
+        return `openrouter/${modelValues}`
+      }
+
+      // Native API: use anthropic/openai providers with official model names
+      if (nativeModelMappings[modelValues]) {
+        return nativeModelMappings[modelValues]
+      }
+      if (modelValues.includes('/')) {
+        return modelValues
+      }
+      if (modelValues.startsWith('claude-') || modelValues.includes('sonnet') || modelValues.includes('opus') || modelValues.includes('haiku')) {
+        return `anthropic/${modelValues}`
+      }
+      if (modelValues.startsWith('gpt-')) {
+        return `openai/${modelValues}`
+      }
+      return modelValues
+    }
     const envVars: Record<string, string> = {}
 
-    if (process.env.OPENAI_API_KEY) {
+    // OpenCode expects OPENAI_API_KEY and OPENAI_BASE_URL for OpenAI-compatible providers
+    if (process.env.OPENROUTER_API_KEY) {
+      envVars.OPENAI_API_KEY = process.env.OPENROUTER_API_KEY
+      envVars.OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
+    } else if (process.env.OPENAI_API_KEY) {
       envVars.OPENAI_API_KEY = process.env.OPENAI_API_KEY
     }
+
+    if (process.env.OPENAI_API_BASE || process.env.OPENAI_BASE_URL) {
+      // OpenCode specifically uses OPENAI_BASE_URL
+      let baseUrl = process.env.OPENAI_API_BASE || process.env.OPENAI_BASE_URL || ''
+      // Ensure it ends with /v1 if it's OpenRouter and missing it
+      if (baseUrl.includes('openrouter.ai') && !baseUrl.endsWith('/v1')) {
+        baseUrl = baseUrl.replace(/\/api\/?$/, '/api/v1')
+        if (!baseUrl.endsWith('/v1')) {
+          baseUrl = baseUrl.endsWith('/') ? `${baseUrl}v1` : `${baseUrl}/v1`
+        }
+      }
+      envVars.OPENAI_BASE_URL = baseUrl
+    }
+
     if (process.env.ANTHROPIC_API_KEY) {
       envVars.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
     }
@@ -325,7 +426,8 @@ EOF`
     // Use the 'opencode run' command for non-interactive execution as documented at https://opencode.ai/docs/cli/
     // This command allows us to pass a prompt directly and get results without the TUI
     // Add model parameter if provided
-    const modelFlag = selectedModel ? ` --model "${selectedModel}"` : ''
+    const modelToUse = mapModelName(selectedModel || 'gpt-5')
+    const modelFlag = ` --model "${modelToUse}"`
 
     // Add session resumption flags if resuming
     let sessionFlags = ''
@@ -348,9 +450,6 @@ EOF`
     // Log the command we're about to execute (with redacted API keys)
     const redactedCommand = fullCommand.replace(/API_KEY="[^"]*"/g, 'API_KEY="[REDACTED]"')
     await logger.command(redactedCommand)
-    if (logger) {
-      await logger.command(redactedCommand)
-    }
 
     // Execute OpenCode run command
     const executeResult = await runCommandInSandbox(sandbox, 'sh', ['-c', fullCommand])

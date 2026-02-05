@@ -60,6 +60,8 @@ export async function executeAgentInSandbox(
     CURSOR_API_KEY: process.env.CURSOR_API_KEY,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+    OPENAI_API_BASE: process.env.OPENAI_API_BASE,
+    OPENAI_BASE_URL: process.env.OPENAI_BASE_URL,
     GH_TOKEN: process.env.GH_TOKEN,
     GITHUB_TOKEN: process.env.GITHUB_TOKEN,
   }
@@ -159,6 +161,8 @@ export async function executeAgentInSandbox(
     process.env.CURSOR_API_KEY = originalEnv.CURSOR_API_KEY
     process.env.ANTHROPIC_API_KEY = originalEnv.ANTHROPIC_API_KEY
     process.env.OPENROUTER_API_KEY = originalEnv.OPENROUTER_API_KEY
+    process.env.OPENAI_API_BASE = originalEnv.OPENAI_API_BASE
+    process.env.OPENAI_BASE_URL = originalEnv.OPENAI_BASE_URL
     process.env.GH_TOKEN = originalEnv.GH_TOKEN
     process.env.GITHUB_TOKEN = originalEnv.GITHUB_TOKEN
   }

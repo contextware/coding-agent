@@ -105,7 +105,7 @@ export async function executeCodexInSandbox(
     }
 
     if (logger) {
-      const keyType = isOpenRouterKey ? 'OpenRouter' : (isOpenAIKey ? 'OpenAI' : 'Custom')
+      const keyType = isOpenRouterKey ? 'OpenRouter' : isOpenAIKey ? 'OpenAI' : 'Custom'
       await logger.info(`Using ${keyType} API key for authentication`)
     }
 
@@ -275,9 +275,7 @@ url = "${server.baseUrl}"
     }
 
     // Prepare the command arguments
-    const args = isResumed
-      ? ['resume', '--last']
-      : ['exec', '--dangerously-bypass-approvals-and-sandbox']
+    const args = isResumed ? ['resume', '--last'] : ['exec', '--dangerously-bypass-approvals-and-sandbox']
 
     if (isResumed && logger) {
       await logger.info('Resuming previous Codex conversation')
@@ -287,9 +285,7 @@ url = "${server.baseUrl}"
     await logger.command(logCommand)
 
     const providerName = isOpenRouterKey ? 'OpenRouter' : 'OpenAI API'
-    await logger.info(
-      `Executing Codex with model ${modelToUse} via ${providerName} and bypassed sandbox restrictions`,
-    )
+    await logger.info(`Executing Codex with model ${modelToUse} via ${providerName} and bypassed sandbox restrictions`)
 
     // Build environment variables for the command
     const env = {

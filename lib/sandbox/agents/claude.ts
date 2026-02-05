@@ -372,7 +372,7 @@ export async function executeClaudeInSandbox(
                         content: accumulatedContent,
                       })
                       .where(eq(taskMessages.id, agentMessageId))
-                      .then(() => { })
+                      .then(() => {})
                       .catch((err) => console.error('Failed to update message:', err))
                   }
                   // Handle tool use
@@ -412,7 +412,7 @@ export async function executeClaudeInSandbox(
                           content: accumulatedContent,
                         })
                         .where(eq(taskMessages.id, agentMessageId))
-                        .then(() => { })
+                        .then(() => {})
                         .catch((err) => console.error('Failed to update message:', err))
                     }
                   }
