@@ -18,10 +18,7 @@ import { checkRateLimit } from '@/lib/utils/rate-limit'
 import { getMaxSandboxDuration } from '@/lib/db/settings'
 import { generateCommitMessage, createFallbackCommitMessage } from '@/lib/utils/commit-message-generator'
 import { detectPortFromRepo } from '@/lib/sandbox/port-detection'
-import {
-  enhancePromptWithBetterAgentsGuidance,
-  type BetterAgentsConfig,
-} from '@/lib/utils/better-agents-guidance'
+import { enhancePromptWithBetterAgentsGuidance, type BetterAgentsConfig } from '@/lib/utils/better-agents-guidance'
 
 export async function POST(req: NextRequest, context: { params: Promise<{ taskId: string }> }) {
   try {

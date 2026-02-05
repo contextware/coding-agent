@@ -22,10 +22,7 @@ import { getGitHubUser } from '@/lib/github/client'
 import { getUserApiKeys } from '@/lib/api-keys/user-keys'
 import { checkRateLimit } from '@/lib/utils/rate-limit'
 import { getMaxSandboxDuration } from '@/lib/db/settings'
-import {
-  enhancePromptWithBetterAgentsGuidance,
-  type BetterAgentsConfig,
-} from '@/lib/utils/better-agents-guidance'
+import { enhancePromptWithBetterAgentsGuidance, type BetterAgentsConfig } from '@/lib/utils/better-agents-guidance'
 
 export async function GET() {
   try {

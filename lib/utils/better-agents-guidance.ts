@@ -57,8 +57,12 @@ better-agents init . \\
   --framework mastra \\
   --llm-provider openrouter \\
   --coding-assistant claude-code \\
-  --goal "Build a customer support chatbot"${config.skills ? ` \\
-  --skills ${config.skills}` : ''}
+  --goal "Build a customer support chatbot"${
+    config.skills
+      ? ` \\
+  --skills ${config.skills}`
+      : ''
+  }
 \`\`\`
 
 ### Default Values to Use
@@ -89,10 +93,7 @@ After initialization, follow the guidelines in the generated AGENTS.md file.
 /**
  * Appends Better Agents guidance to a user prompt when enabled.
  */
-export function enhancePromptWithBetterAgentsGuidance(
-  prompt: string,
-  config: BetterAgentsConfig
-): string {
+export function enhancePromptWithBetterAgentsGuidance(prompt: string, config: BetterAgentsConfig): string {
   if (!config.enabled) {
     return prompt
   }
