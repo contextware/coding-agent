@@ -8,12 +8,6 @@ import { redactSensitiveInfo } from '@/lib/utils/logging'
 import { TaskLogger } from '@/lib/utils/task-logger'
 import { detectPackageManager, installDependencies } from './package-manager'
 import { registerSandbox } from './sandbox-registry'
-import {
-  generateAgentSpecificGuidance,
-  detectProjectConfig,
-  detectPythonProjectConfig,
-  type AgentGuidanceConfig,
-} from './agent-guidance'
 
 // Helper function to run command and log it
 async function runAndLogCommand(sandbox: Sandbox, command: string, args: string[], logger: TaskLogger, cwd?: string) {
@@ -777,83 +771,63 @@ SKILL_EOF`
       }
     }
 
-    // Install Better Agents guidance with LangWatch instrumentation
-    if (config.includeBetterAgentsGuidance !== false) {
-      await logger.info('Installing Better Agents guidance with LangWatch instrumentation...')
+    // Initialize project with Better Agents CLI for proper guidance and structure
+    if (config.initWithBetterAgents) {
+      await logger.info('Initializing project with Better Agents...')
 
-      const agentType = (config.selectedAgent || 'claude') as
-        | 'claude'
-        | 'gemini'
-        | 'cursor'
-        | 'codex'
-        | 'copilot'
-        | 'opencode'
+      // Install better-agents CLI globally
+      const installBetterAgents = await runCommandInSandbox(sandbox, 'npm', [
+        'install',
+        '-g',
+        '@contextware/better-agents',
+      ])
 
-      // Try to detect project configuration from package.json or requirements.txt
-      let projectConfig: AgentGuidanceConfig = {
-        includeLangWatch: true,
-        includeBetterAgentsStructure: true,
-        projectGoal: config.projectGoal,
-      }
-
-      // Try to read package.json for JavaScript/TypeScript projects
-      const packageJsonResult = await runInProject(sandbox, 'cat', ['package.json'])
-      if (packageJsonResult.success && packageJsonResult.output) {
-        try {
-          const packageJson = JSON.parse(packageJsonResult.output)
-          const detectedConfig = detectProjectConfig(packageJson)
-          projectConfig = { ...projectConfig, ...detectedConfig }
-        } catch {
-          // Failed to parse package.json, use defaults
-        }
+      if (!installBetterAgents.success) {
+        await logger.info('Warning: Failed to install better-agents CLI')
       } else {
-        // Try to detect Python project
-        const requirementsResult = await runInProject(sandbox, 'cat', ['requirements.txt'])
-        if (requirementsResult.success && requirementsResult.output) {
-          const detectedConfig = detectPythonProjectConfig(requirementsResult.output)
-          projectConfig = { ...projectConfig, ...detectedConfig }
+        await logger.info('better-agents CLI installed')
+
+        // Build the better-agents init command with options
+        const initArgs: string[] = ['.']
+
+        // Add goal if provided
+        if (config.betterAgentsGoal) {
+          initArgs.push('--goal', config.betterAgentsGoal)
+        }
+
+        // Add skills if provided (comma-separated list or 'all')
+        if (config.betterAgentsSkills) {
+          initArgs.push('--skills', config.betterAgentsSkills)
+        }
+
+        // Add LangWatch endpoint if provided
+        if (config.betterAgentsLangWatchEndpoint) {
+          initArgs.push('--langwatch-endpoint', config.betterAgentsLangWatchEndpoint)
+        }
+
+        // Map selected agent to better-agents coding assistant option
+        const agentToCodingAssistant: Record<string, string> = {
+          claude: 'claude-code',
+          gemini: 'gemini-cli',
+          cursor: 'cursor',
+          copilot: 'copilot',
+          opencode: 'opencode',
+          codex: 'codex',
+        }
+        const codingAssistant = agentToCodingAssistant[config.selectedAgent || 'claude']
+        if (codingAssistant) {
+          initArgs.push('--coding-assistant', codingAssistant)
+        }
+
+        // Run better-agents init in the project directory
+        await logger.info('Running better-agents init...')
+        const betterAgentsInit = await runInProject(sandbox, 'better-agents', ['init', ...initArgs])
+
+        if (betterAgentsInit.success) {
+          await logger.info('Better Agents initialized successfully')
         } else {
-          // Check for pyproject.toml
-          const pyprojectResult = await runInProject(sandbox, 'cat', ['pyproject.toml'])
-          if (pyprojectResult.success && pyprojectResult.output) {
-            const detectedConfig = detectPythonProjectConfig(pyprojectResult.output)
-            projectConfig = { ...projectConfig, ...detectedConfig }
-          }
+          await logger.info('Warning: Failed to initialize Better Agents')
         }
-      }
-
-      // Generate agent-specific guidance
-      const guidance = generateAgentSpecificGuidance(agentType, projectConfig)
-
-      // Determine the full path for the guidance file
-      let guidancePath: string
-      if (agentType === 'claude') {
-        guidancePath = `${PROJECT_DIR}/${guidance.path}`
-      } else if (agentType === 'gemini') {
-        guidancePath = '/home/vercel-sandbox/.gemini/BETTER_AGENTS.md'
-      } else if (agentType === 'cursor') {
-        guidancePath = `${PROJECT_DIR}/${guidance.path}`
-      } else if (agentType === 'copilot') {
-        guidancePath = `${PROJECT_DIR}/${guidance.path}`
-      } else {
-        // codex, opencode - use home directory
-        guidancePath = '/home/vercel-sandbox/BETTER_AGENTS.md'
-      }
-
-      // Create directory if needed
-      const dirPath = guidancePath.substring(0, guidancePath.lastIndexOf('/'))
-      await runCommandInSandbox(sandbox, 'mkdir', ['-p', dirPath])
-
-      // Write the guidance file using heredoc
-      const writeGuidanceCmd = `cat > ${guidancePath} << 'GUIDANCE_EOF'
-${guidance.content}
-GUIDANCE_EOF`
-      const writeGuidance = await runCommandInSandbox(sandbox, 'sh', ['-c', writeGuidanceCmd])
-
-      if (writeGuidance.success) {
-        await logger.info('Better Agents guidance installed successfully')
-      } else {
-        await logger.info('Warning: Failed to install Better Agents guidance')
       }
     }
 
