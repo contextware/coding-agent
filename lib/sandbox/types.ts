@@ -29,6 +29,10 @@ export interface SandboxConfig {
   preDeterminedBranchName?: string
   onProgress?: (progress: number, message: string) => Promise<void>
   onCancellationCheck?: () => Promise<boolean>
+  /** Include Better Agents guidance with LangWatch instrumentation (default: true) */
+  includeBetterAgentsGuidance?: boolean
+  /** Project goal to include in agent guidance */
+  projectGoal?: string
 }
 
 export interface SandboxResult {

@@ -359,7 +359,12 @@ EOF`
           return `openrouter/${modelValues}`
         }
         // Fallback: add appropriate prefix
-        if (modelValues.startsWith('claude-') || modelValues.includes('sonnet') || modelValues.includes('opus') || modelValues.includes('haiku')) {
+        if (
+          modelValues.startsWith('claude-') ||
+          modelValues.includes('sonnet') ||
+          modelValues.includes('opus') ||
+          modelValues.includes('haiku')
+        ) {
           return `openrouter/anthropic/${modelValues}`
         }
         if (modelValues.startsWith('gpt-')) {
@@ -375,7 +380,12 @@ EOF`
       if (modelValues.includes('/')) {
         return modelValues
       }
-      if (modelValues.startsWith('claude-') || modelValues.includes('sonnet') || modelValues.includes('opus') || modelValues.includes('haiku')) {
+      if (
+        modelValues.startsWith('claude-') ||
+        modelValues.includes('sonnet') ||
+        modelValues.includes('opus') ||
+        modelValues.includes('haiku')
+      ) {
         return `anthropic/${modelValues}`
       }
       if (modelValues.startsWith('gpt-')) {
