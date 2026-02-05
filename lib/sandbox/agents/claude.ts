@@ -11,6 +11,18 @@ import { generateId } from '@/lib/utils/id'
 
 type Connector = typeof connectors.$inferSelect
 
+/**
+ * Escapes a string for safe use in shell commands by using single quotes.
+ * Single quotes prevent all shell interpretation except for single quotes themselves.
+ * Any single quotes in the input are escaped by ending the quoted string,
+ * adding an escaped single quote, and starting a new quoted string.
+ */
+function shellEscape(str: string): string {
+  // Replace single quotes with: end quote, escaped single quote, start quote
+  // 'text with '\'' single quote' becomes a valid shell string
+  return "'" + str.replace(/'/g, "'\\''") + "'"
+}
+
 // Helper function to run command and collect logs in project directory
 async function runAndLogCommand(sandbox: Sandbox, command: string, args: string[], logger: TaskLogger) {
   const fullCommand = args.length > 0 ? `${command} ${args.join(' ')}` : command
@@ -324,7 +336,7 @@ export async function executeClaudeInSandbox(
       }
     }
 
-    fullCommand += ` "${instruction}"`
+    fullCommand += ` ${shellEscape(instruction)}`
 
     if (logger) {
       await logger.info('Executing Claude CLI with --dangerously-skip-permissions for automated file changes...')

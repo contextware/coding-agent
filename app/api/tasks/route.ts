@@ -321,6 +321,7 @@ async function processTaskWithTimeout(
         apiKeys,
         githubToken,
         githubUser,
+        betterAgentsConfig,
       ),
       timeoutPromise,
     ])
@@ -400,6 +401,7 @@ async function processTask(
     name: string | null
     email: string | null
   } | null,
+  betterAgentsConfig?: BetterAgentsConfig,
 ) {
   let sandbox: Sandbox | null = null
   const logger = createTaskLogger(taskId)

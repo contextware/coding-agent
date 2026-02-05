@@ -35,50 +35,52 @@ Use the better-agents CLI when the user wants to:
 - Set up proper testing infrastructure for agents
 - Create a project with LangWatch integration
 
-### How to Initialize
+### Running the CLI (Non-Interactive Mode)
 
-Before running the CLI, ask the user for the following information if not already provided:
+IMPORTANT: The CLI runs in interactive mode by default which will hang in automated environments. You MUST provide ALL required flags for non-interactive execution.
 
-1. **Project Goal**: What is the agent supposed to do? (e.g., "customer support chatbot", "code review assistant")
-${config.goal ? `   - Already provided: "${config.goal}"` : '   - Ask: "What is the main goal of your agent?"'}
+Required flags for non-interactive mode:
+- --language: python or typescript
+- --framework: agno, mastra, langgraph-py, langgraph-ts, google-adk, or vercel-ai
+- --llm-provider: openai, anthropic, gemini, bedrock, openrouter, or grok
+- --coding-assistant: claude-code, cursor, gemini-cli, or none
+- --goal: Description of what the agent should do
 
-2. **Programming Language**: TypeScript or Python?
-   - Ask: "Which language would you prefer - TypeScript or Python?"
+Optional flags:
+- --skills: Comma-separated list of skills (e.g., hubspot,slack,incident-management)
 
-3. **Agent Framework** (optional): Which framework to use?
-   - Options: Agno, Mastra, LangGraph, LangChain, or none
-   - Ask: "Do you have a preferred agent framework? (Agno, Mastra, LangGraph, LangChain, or none)"
-
-4. **Skills** (optional): Any specific integrations needed?
-${config.skills ? `   - Already provided: "${config.skills}"` : '   - Ask: "Do you need any specific integrations? (e.g., hubspot, slack, incident-management)"'}
-
-5. **LangWatch API Key** (optional): For observability
-   - Ask: "Do you have a LangWatch API key for observability? (Get one at https://app.langwatch.ai/authorize)"
-
-### Running the CLI
-
-Once you have the information, run:
+Example command (use sensible defaults based on the user request):
 
 \`\`\`bash
-# Install the CLI if not already installed
-npm install -g @contextware/better-agents
-
-# Initialize the project
-better-agents init . --goal "<goal>" --skills <skills>
+better-agents init . \\
+  --language typescript \\
+  --framework mastra \\
+  --llm-provider openrouter \\
+  --coding-assistant claude-code \\
+  --goal "Build a customer support chatbot"${config.skills ? ` \\
+  --skills ${config.skills}` : ''}
 \`\`\`
 
-The CLI will create:
-- \`AGENTS.md\` - Development guidelines with LangWatch instrumentation
-- \`prompts/\` - Versioned prompt files
-- \`tests/scenarios/\` - End-to-end scenario tests
-- \`tests/evaluations/\` - Evaluation notebooks
-- \`.mcp.json\` - MCP server configuration
+### Default Values to Use
 
-### Important
+Unless the user specifies otherwise, use these defaults:
+- language: typescript (for web projects) or python (for data/ML projects)
+- framework: mastra (TypeScript) or agno (Python)
+- llm-provider: openrouter (already configured in this environment)
+- coding-assistant: claude-code
 
-- Always ask for the required information before running the CLI
-- If the user provides partial information, ask for the missing pieces
-- After initialization, follow the guidelines in the generated AGENTS.md
+${config.goal ? `User-provided goal: "${config.goal}"` : 'Ask the user: "What is the main goal of your agent?"'}
+${config.skills ? `User-provided skills: "${config.skills}"` : ''}
+
+### What the CLI Creates
+
+- AGENTS.md - Development guidelines with LangWatch instrumentation
+- prompts/ - Versioned prompt files
+- tests/scenarios/ - End-to-end scenario tests
+- tests/evaluations/ - Evaluation notebooks
+- .mcp.json - MCP server configuration
+
+After initialization, follow the guidelines in the generated AGENTS.md file.
 `
 
   return guidance.trim()
